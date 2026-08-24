@@ -1,0 +1,388 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import {
+  ConsolePanel, DeployPanel, GameOverPanel, MetricsPanel, OfferPanel, QueuePanel, ShopPanel, ToolsPanel,
+} from "@/components/game/windows";
+import { AlertDialog } from "@/components/os/AlertDialog";
+import { Dock } from "@/components/os/Dock";
+import { MenuBar } from "@/components/os/MenuBar";
+import { Window, type WinPos } from "@/components/os/Window";
+import { CANARY, CHART, COIN, FLAME, MAGNIFIER, ROCKET, SERVER, SKULL, WARNING, WRENCH } from "@/components/pixel/sprites";
+import { ABOUT_LINES, BOOT_LINES, CONSOLE_REPLIES, inr } from "@/lib/engine/content";
+import { clockLabel, useGame } from "@/lib/useGame";
+import { sfx } from "@/lib/sfx";
+
+const WINDOWS = [
+  { id: "deploy", title: "deploy.app", icon: ROCKET, width: 400, x: 32, y: 56, open: true },
+  { id: "queue", title: "queue.mon", icon: SERVER, width: 240, x: 456, y: 56, open: true },
+  { id: "metrics", title: "metrics.mon", icon: CHART, width: 330, x: 456, y: 268, open: true },
+  { id: "tools", title: "tools.kit", icon: WRENCH, width: 360, x: 810, y: 56, open: true },
+  { id: "console", title: "console.log", icon: MAGNIFIER, width: 420, x: 32, y: 452, open: true },
+  { id: "upgrades", title: "upgrades.store", icon: COIN, width: 620, x: 300, y: 150, open: false },
+] as const;
+
+type Id = (typeof WINDOWS)[number]["id"];
+
+export default function Page() {
+  const { view, busy, stage, stageLabel, log, toasts, dialog, shake, start, send, dismiss, say } = useGame();
+  const [about, setAbout] = useState(false);
+  const [booting, setBooting] = useState<number | null>(null);
+
+  const [pos, setPos] = useState<Record<Id, WinPos>>(() =>
+    Object.fromEntries(
+      WINDOWS.map((w, i) => [w.id, { x: w.x, y: w.y, z: i + 1, open: w.open, w: w.width, h: null }]),
+    ) as Record<Id, WinPos>,
+  );
+  const zTop = useRef(WINDOWS.length);
+  const [history, setHistory] = useState<{ uptime: number[]; users: number[]; cash: number[] }>({
+    uptime: [], users: [], cash: [],
+  });
+
+  // Keep the default layout on screen on smaller displays.
+  useEffect(() => {
+    setPos((p) => {
+      const next = { ...p };
+      for (const w of WINDOWS) {
+        next[w.id] = {
+          ...next[w.id],
+          x: Math.min(next[w.id].x, Math.max(8, window.innerWidth - next[w.id].w - 16)),
+          y: Math.min(next[w.id].y, Math.max(40, window.innerHeight - 160)),
+        };
+      }
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!view) return;
+    setHistory((h) => ({
+      uptime: [...h.uptime, view.uptime].slice(-40),
+      users: [...h.users, view.users].slice(-40),
+      cash: [...h.cash, view.cash].slice(-40),
+    }));
+  }, [view]);
+
+  /** A: the boot sequence. Shown once per browser, skippable, then it never nags again. */
+  const boot = useCallback(async () => {
+    let seen = false;
+    try {
+      seen = localStorage.getItem("prodos:booted") === "1";
+    } catch {
+      // site data blocked — just skip the sequence
+    }
+    if (seen) {
+      void start();
+      return;
+    }
+    sfx.boot();
+    for (let i = 0; i <= BOOT_LINES.length; i++) {
+      setBooting(i);
+      await new Promise((r) => setTimeout(r, 420));
+    }
+    try {
+      localStorage.setItem("prodos:booted", "1");
+    } catch {
+      // fine
+    }
+    setBooting(null);
+    void start();
+  }, [start]);
+
+  const focus = useCallback((id: Id) => {
+    zTop.current += 1;
+    setPos((p) => ({ ...p, [id]: { ...p[id], z: zTop.current } }));
+  }, []);
+
+  const toggle = useCallback((id: string) => {
+    setPos((p) => ({ ...p, [id as Id]: { ...p[id as Id], open: !p[id as Id].open } }));
+    focus(id as Id);
+  }, [focus]);
+
+  // The shop is a window, so it opens itself when there is something to buy.
+  useEffect(() => {
+    if (!view) return;
+    setPos((p) => {
+      const shouldOpen = view.phase === "shop";
+      if (p.upgrades.open === shouldOpen) return p;
+      return { ...p, upgrades: { ...p.upgrades, open: shouldOpen } };
+    });
+  }, [view?.phase, view]);
+
+  const canAct = !!view && view.phase === "deploying" && !busy && !dialog;
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      // Typing in the console prompt must not deploy to production.
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      const k = e.key.toLowerCase();
+
+      if (dialog?.kind === "incident") {
+        if (k === "r") void send({ kind: "incident", choice: "rollback" });
+        if (k === "h") void send({ kind: "incident", choice: "hotfix" });
+        if (k === "w") void send({ kind: "incident", choice: "wait" });
+        return;
+      }
+      if (about) {
+        if (k === "enter" || k === " " || k === "escape") setAbout(false);
+        return;
+      }
+      if (dialog?.kind === "offer") return;   // signing ends the run — click it deliberately
+      if (dialog) {
+        if (k === "enter" || k === " ") dismiss();
+        return;
+      }
+      if (!canAct || !view) return;
+
+      if (k === "d") void send({ kind: "deploy" });
+      else if (k === "s" && view.velocity > 0) void send({ kind: "skip" });
+      else if (k === "f" && view.flagAvailable) void send({ kind: "flag" });
+      else if (/^[1-6]$/.test(k)) {
+        const tool = view.hand[Number(k) - 1];
+        if (tool) void send({ kind: "item", item: tool.id });
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [about, canAct, dialog, dismiss, send, view]);
+
+  /** K: the console prompt. Cosmetic, and it keeps the easter eggs out of the game hotkeys. */
+  const runCommand = useCallback(
+    (input: string) => {
+      const cmd = input.toLowerCase().trim();
+      sfx.keyed();
+      say(`> ${input}`);
+      const reply = CONSOLE_REPLIES[cmd];
+      say(reply ?? `command not found: ${cmd.split(" ")[0]}`, reply ? "info" : "bad");
+    },
+    [say],
+  );
+
+  const dockItems = useMemo(
+    () =>
+      WINDOWS.map((w) => ({
+        id: w.id,
+        label: w.title.split(".")[0],
+        icon: w.icon,
+        open: pos[w.id].open,
+        attention: w.id === "upgrades" && view?.phase === "shop",
+      })),
+    [pos, view?.phase],
+  );
+
+  const win = (id: Id, children: React.ReactNode, footer?: React.ReactNode) => {
+    const meta = WINDOWS.find((w) => w.id === id)!;
+    return (
+      <Window
+        key={id}
+        title={meta.title}
+        pos={pos[id]}
+        defaultW={meta.width}
+        shake={id === "deploy" && shake}
+        focused={pos[id].z === Math.max(...Object.values(pos).map((w) => w.z))}
+        onFocus={() => focus(id)}
+        onMove={(x, y) => setPos((p) => ({ ...p, [id]: { ...p[id], x, y } }))}
+        onResize={(w, h) => setPos((p) => ({ ...p, [id]: { ...p[id], w, h } }))}
+        onClose={() => setPos((p) => ({ ...p, [id]: { ...p[id], open: false } }))}
+        footer={footer}
+      >
+        {children}
+      </Window>
+    );
+  };
+
+  return (
+    <div className="desktop">
+      <MenuBar
+        onNewRun={() => void start()}
+        onAbout={() => setAbout(true)}
+        clock={view ? clockLabel(view.clock) : "Mon 09:12"}
+      />
+
+      {view ? (
+        <>
+          {win(
+            "deploy",
+            <DeployPanel
+              view={view}
+              busy={busy}
+              stage={stage}
+              stageLabel={stageLabel}
+              onDeploy={() => void send({ kind: "deploy" })}
+              onSkip={() => void send({ kind: "skip" })}
+              onFlag={() => void send({ kind: "flag" })}
+            />,
+            <span className="muted small">
+              deploying blind pays 1.5x — {view.stats.recklessDeploys} reckless so far
+            </span>,
+          )}
+          {win("queue", <QueuePanel view={view} />)}
+          {win("metrics", <MetricsPanel view={view} history={history} />)}
+          {win("tools", <ToolsPanel view={view} busy={busy} onUse={(item) => void send({ kind: "item", item })} />,
+            <span className="muted small">{view.hand.length}/{view.handCap} slots used</span>)}
+          {win("console", <ConsolePanel log={log} onCommand={runCommand} />)}
+          {win(
+            "upgrades",
+            <ShopPanel
+              view={view}
+              busy={busy}
+              onBuy={(id) => void send({ kind: "buy", id })}
+              onNext={() => void send({ kind: "nextRound" })}
+            />,
+          )}
+        </>
+      ) : null}
+
+      {toasts.length ? (
+        <div className="toasts">
+          {toasts.map((t) => (
+            <div key={t.id} className="toast">
+              <span className="toastchannel">{t.channel}</span>
+              <span>{t.text}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      <Dock items={dockItems} onToggle={toggle} />
+
+      {booting !== null ? (
+        <div className="bootscreen" onClick={() => setBooting(BOOT_LINES.length)}>
+          <p className="bootheader">PRODOS 1.0</p>
+          {BOOT_LINES.slice(0, booting).map(([label, result]) => (
+            <p key={label}>
+              {label}
+              {".".repeat(Math.max(2, 36 - label.length))} {result}
+            </p>
+          ))}
+          {booting >= BOOT_LINES.length ? <p className="bootok">ready.</p> : null}
+        </div>
+      ) : null}
+
+      {about ? (
+        <AlertDialog
+          title="About this startup"
+          icon={SERVER}
+          actions={[{ label: "OK", primary: true, hint: "RET", onClick: () => setAbout(false) }]}
+        >
+          <h2>PRODOS 1.0</h2>
+          <dl className="summary">
+            {ABOUT_LINES.map(([k, v]) => (
+              <div key={k}>
+                <dt>{k}</dt>
+                <dd>{v}</dd>
+              </div>
+            ))}
+          </dl>
+        </AlertDialog>
+      ) : null}
+
+      {!view && booting === null ? (
+        <AlertDialog
+          title="PRODOS 1.0"
+          icon={ROCKET}
+          actions={[{ label: "BOOT", primary: true, onClick: () => void boot() }]}
+        >
+          <h2>PROD ROULETTE</h2>
+          <p>Six deployments in the queue. Some are safe. Some take production down.</p>
+          <p>You are told how many. Never which.</p>
+          <p className="muted small">keys: D deploy · S staging · 1-6 tools · R/H/W during an incident</p>
+        </AlertDialog>
+      ) : null}
+
+      {view && dialog?.kind === "incident" && view.pending ? (
+        <AlertDialog
+          title="INCIDENT"
+          icon={FLAME}
+          tone="bad"
+          actions={[
+            { label: "ROLLBACK", hint: "R", danger: true, onClick: () => void send({ kind: "incident", choice: "rollback" }) },
+            { label: "HOTFIX", hint: "H", onClick: () => void send({ kind: "incident", choice: "hotfix" }) },
+            { label: "WAIT IT OUT", hint: "W", onClick: () => void send({ kind: "incident", choice: "wait" }) },
+          ]}
+        >
+          <h2>{view.pending.title}</h2>
+          {view.pending.lines.map((l) => (
+            <p key={l} className="bad">{l}</p>
+          ))}
+          <p>Users affected: <b>{view.pending.usersHit.toLocaleString("en-IN")}</b></p>
+          <p>Exposure: <b className="bad">{inr(view.pending.cashLoss)}</b></p>
+        </AlertDialog>
+      ) : null}
+
+      {dialog?.kind === "result" ? (
+        <AlertDialog
+          title={dialog.absorbed ? "CONTAINED" : dialog.ok ? "RECOVERED" : "STILL BROKEN"}
+          icon={dialog.absorbed ? CANARY : dialog.ok ? CHART : WARNING}
+          tone={dialog.ok ? "good" : "bad"}
+          actions={[{ label: "OK", primary: true, hint: "RET", onClick: dismiss }]}
+        >
+          <h2>
+            {dialog.absorbed
+              ? "The canary fleet took it"
+              : `${dialog.choice.toUpperCase()} ${dialog.ok ? "SUCCEEDED" : "FAILED"}`}
+          </h2>
+          {dialog.reason ? <p className="bad">Reason: {dialog.reason}</p> : null}
+          <p>uptime lost: <b className={dialog.damage ? "bad" : "good"}>{dialog.damage}</b></p>
+          <p>cash burned: <b className="bad">{inr(dialog.loss)}</b></p>
+        </AlertDialog>
+      ) : null}
+
+      {view && dialog?.kind === "offer" && view.offer ? (
+        <AlertDialog
+          title="ACQUISITION OFFER"
+          icon={COIN}
+          tone="good"
+          actions={[
+            { label: "SIGN", primary: true, onClick: () => void send({ kind: "sign" }) },
+            { label: "DECLINE", danger: true, onClick: () => void send({ kind: "decline" }) },
+          ]}
+        >
+          <OfferPanel view={view} />
+        </AlertDialog>
+      ) : null}
+
+      {dialog?.kind === "rewards" ? (
+        <AlertDialog
+          title="SPRINT CLEARED"
+          icon={COIN}
+          tone="good"
+          actions={[{ label: "COLLECT", primary: true, hint: "RET", onClick: dismiss }]}
+        >
+          <h2>+{inr(dialog.bonus)}</h2>
+          <p>sprint revenue banked.</p>
+          {dialog.heal ? <p className="good">+1 uptime recovered overnight.</p> : null}
+          {dialog.got.length ? <p>new tools: {dialog.got.join(", ")}</p> : null}
+          <p className="muted small">investor update sent: {dialog.investor}</p>
+        </AlertDialog>
+      ) : null}
+
+      {view && dialog?.kind === "over" ? (
+        <AlertDialog
+          title={dialog.outcome === "acquired" ? "ACQUIRED" : "RUN OVER"}
+          icon={dialog.outcome === "acquired" ? COIN : dialog.outcome === "insolvent" ? WARNING : SKULL}
+          tone={dialog.outcome === "acquired" ? "good" : "bad"}
+          actions={[{ label: "NEW RUN", primary: true, onClick: () => void start() }]}
+        >
+          <h2>
+            {dialog.outcome === "acquired"
+              ? `SOLD FOR ${inr(dialog.score)}`
+              : dialog.outcome === "insolvent"
+                ? "OUT OF RUNWAY"
+                : "PRODUCTION IS DOWN"}
+          </h2>
+          <p className="muted">
+            {dialog.outcome === "acquired"
+              ? "You got out. Someone else owns the pager now."
+              : dialog.outcome === "insolvent"
+                ? "Payroll came due and the account was empty."
+                : "Uptime hit zero. Nobody can reach the site."}
+          </p>
+          <GameOverPanel view={view} />
+        </AlertDialog>
+      ) : null}
+    </div>
+  );
+}

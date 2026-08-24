@@ -1,0 +1,518 @@
+/* PRODOS — an operating system that does not exist, drawn in whole pixels. */
+
+:root {
+  --ink: #16161a;
+  --paper: #e8e8e0;
+  --chrome: #c8c8c0;
+  --chrome-hi: #f4f4ec;
+  --chrome-lo: #8a8a82;
+  --desk: #2f4858;
+  --desk-alt: #263c49;
+  --green: #2f9e57;
+  --green-br: #3ac06a;
+  --red: #d33b2d;
+  --amber: #e0a41f;
+  --blue: #4a7fd4;
+  --font-stack-ui: var(--font-ui), "Courier New", monospace;
+  --font-stack-mono: var(--font-mono), "Courier New", monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--desk);
+  background-image: repeating-linear-gradient(45deg, var(--desk-alt) 0 1px, transparent 1px 3px);
+  color: var(--ink);
+  font-family: var(--font-stack-ui);
+  font-size: 10px;
+  line-height: 1.7;
+  -webkit-font-smoothing: none;
+  image-rendering: pixelated;
+}
+
+button { font-family: inherit; }
+h2 { font-size: 12px; margin: 0 0 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+p { margin: 0 0 4px; }
+
+.desktop { position: relative; height: 100%; }
+
+/* ---------- menu bar ---------- */
+
+.menubar {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 6px;
+  background: var(--paper);
+  border-bottom: 2px solid var(--ink);
+  z-index: 1000;
+}
+.menubar .logo { font-size: 12px; padding-right: 4px; }
+.menubar .menuspace { flex: 1; }
+.menubar .clock { font-family: var(--font-stack-mono); font-size: 14px; letter-spacing: 1px; }
+.menu { position: relative; }
+.menutitle {
+  border: 0;
+  background: none;
+  padding: 2px 7px;
+  font-size: 10px;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+.menutitle:hover, .menutitle.active { background: var(--ink); color: var(--chrome-hi); }
+.dropdown {
+  position: absolute;
+  top: 20px;
+  left: 0;
+  min-width: 168px;
+  margin: 0;
+  padding: 2px;
+  list-style: none;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45);
+}
+.dropdown button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: none;
+  padding: 4px 6px;
+  font-size: 10px;
+  cursor: pointer;
+}
+.dropdown button:hover { background: var(--ink); color: var(--chrome-hi); }
+
+/* ---------- windows ---------- */
+
+.win {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  box-shadow: 5px 5px 0 rgba(0, 0, 0, 0.45);
+}
+.titlebar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 4px;
+  border-bottom: 2px solid var(--ink);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+.titlebar:active { cursor: grabbing; }
+.stripes {
+  flex: 1;
+  height: 11px;
+  background: repeating-linear-gradient(to bottom, var(--ink) 0 1px, transparent 1px 3px);
+}
+.wintitle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  white-space: nowrap;
+}
+.closebox {
+  width: 11px;
+  height: 11px;
+  flex: none;
+  border: 2px solid var(--ink);
+  background: var(--paper);
+  padding: 0;
+  cursor: pointer;
+}
+.closebox:hover { background: var(--red); }
+.closebox.ghost { border-color: var(--chrome-lo); cursor: default; }
+
+/* classic zoom box: a square with a smaller square nested in it */
+.zoombox {
+  width: 11px;
+  height: 11px;
+  flex: none;
+  padding: 0;
+  border: 2px solid var(--ink);
+  background-color: var(--paper);
+  background-image: linear-gradient(to bottom, var(--ink) 0 3px, transparent 3px),
+    linear-gradient(to right, var(--ink) 0 3px, transparent 3px);
+  cursor: pointer;
+}
+.zoombox:hover { background-color: var(--amber); }
+/* Flexing the body is what lets an explicit window height scroll instead of overflow. */
+.winbody { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 8px 10px 10px; }
+.winfooter {
+  flex: none;
+  padding: 4px 22px 4px 10px;   /* room for the grow box */
+  border-top: 2px solid var(--ink);
+  background: var(--chrome);
+}
+
+.growbox {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 2px solid var(--ink);
+  border-right: 0;
+  border-bottom: 0;
+  background-color: var(--paper);
+  background-image: linear-gradient(
+    135deg,
+    transparent 0 34%, var(--ink) 34% 46%,
+    transparent 46% 62%, var(--ink) 62% 74%,
+    transparent 74%
+  );
+  cursor: nwse-resize;
+  touch-action: none;
+}
+.growbox:hover { background-color: var(--chrome); }
+
+/* ---------- controls ---------- */
+
+.btn {
+  padding: 6px 10px;
+  border: 2px solid var(--ink);
+  background: var(--chrome);
+  box-shadow: 3px 3px 0 var(--ink);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+}
+.btn:active:not(:disabled) { transform: translate(3px, 3px); box-shadow: none; }
+.btn:disabled { opacity: 0.35; box-shadow: none; cursor: not-allowed; }
+.btn.primary { background: var(--green-br); }
+.btn.danger { background: var(--red); color: var(--chrome-hi); }
+.btn.small { padding: 3px 6px; box-shadow: 2px 2px 0 var(--ink); }
+.btn.wide { width: 100%; margin-top: 8px; }
+.btn em { display: block; font-size: 8px; font-style: normal; opacity: 0.55; }
+.actions { display: flex; gap: 8px; margin-top: 10px; }
+
+/* ---------- deploy panel ---------- */
+
+.version { font-size: 12px; margin-bottom: 6px; }
+.badge {
+  margin-left: 6px;
+  padding: 1px 4px;
+  border: 2px solid var(--ink);
+  font-size: 8px;
+}
+.badge.friday { background: var(--amber); }
+.changes { margin: 0 0 8px; padding: 0; list-style: none; color: #2c5f8a; }
+.signals { display: grid; gap: 2px; margin: 0; }
+.signals div { display: flex; gap: 8px; }
+.signals dt { width: 58px; color: var(--chrome-lo); }
+.signals dd { margin: 0; }
+.progress { margin-top: 12px; }
+.progress .bar { height: 14px; border: 2px solid var(--ink); background: var(--chrome-lo); }
+.progress .bar span {
+  display: block;
+  height: 100%;
+  background: repeating-linear-gradient(90deg, var(--amber) 0 4px, var(--ink) 4px 6px);
+  transition: width 0.28s steps(4);
+}
+.stagelabel { margin-top: 4px; font-family: var(--font-stack-mono); font-size: 14px; }
+
+/* ---------- queue: position only. the tally lives in the player's head. ---------- */
+
+.sprintname { margin: 0; color: var(--chrome-lo); text-transform: uppercase; letter-spacing: 0.5px; }
+.position { margin: 0 0 4px; font-size: 19px; }
+
+/* ---------- metrics ---------- */
+
+.meter { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.bars b {
+  display: inline-block;
+  width: 14px;
+  height: 16px;
+  border: 2px solid var(--ink);
+  margin-right: 3px;
+}
+.bars b.on { background: var(--green-br); }
+.bars.warn b.on { background: var(--amber); }
+.bars.critical b.on { background: var(--red); animation: blink 0.6s steps(2) infinite; }
+.readouts { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; }
+.readouts .label, .meter .label { color: var(--chrome-lo); display: block; }
+.vt { font-family: var(--font-stack-mono); font-size: 17px; line-height: 1.1; }
+.charts { display: flex; gap: 10px; margin-top: 10px; }
+.chart { display: grid; gap: 2px; justify-items: start; }
+.chart-label { color: var(--chrome-lo); font-size: 8px; }
+.installed { display: flex; align-items: center; gap: 5px; margin-top: 8px; }
+
+/* ---------- tools ---------- */
+
+.tools { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.tool {
+  display: grid;
+  grid-template-columns: 12px 1fr auto;
+  grid-template-areas: "icon name key" "icon blurb key";
+  align-items: center;
+  gap: 2px 8px;
+  width: 100%;
+  text-align: left;
+  padding: 5px 7px;
+  border: 2px solid var(--ink);
+  background: var(--chrome);
+  box-shadow: 3px 3px 0 var(--ink);
+  cursor: pointer;
+  font-size: 10px;
+}
+.tool canvas { grid-area: icon; }
+.toolname { grid-area: name; }
+.toolblurb { grid-area: blurb; color: #5a5a52; font-size: 8px; }
+.tool em { grid-area: key; font-style: normal; opacity: 0.5; }
+.tool:active:not(:disabled) { transform: translate(3px, 3px); box-shadow: none; }
+.tool:disabled { opacity: 0.4; box-shadow: none; cursor: not-allowed; }
+
+/* ---------- console ---------- */
+
+.console {
+  list-style: none;
+  margin: 0;
+  padding: 6px 8px;
+  background: var(--ink);
+  color: #9dffb0;
+  font-family: var(--font-stack-mono);
+  font-size: 15px;
+  line-height: 1.35;
+  flex: 1 1 auto;
+  min-height: 120px;
+  overflow-y: auto;
+}
+.console li { margin: 0; }
+.console .prompt { opacity: 0.45; }
+.console .bad { color: #ff8f7f; }
+.console .good { color: #8dffa8; }
+.console .muted { color: #6f7d72; }
+
+/* ---------- shop ---------- */
+
+.shop { width: 100%; border-collapse: collapse; }
+.shop td { padding: 3px 6px; border-bottom: 1px solid var(--chrome); vertical-align: middle; }
+.shop .blurb { color: #5a5a52; }
+.shop .price { font-family: var(--font-stack-mono); font-size: 15px; white-space: nowrap; }
+.shop tr.owned { opacity: 0.45; }
+
+/* ---------- dialogs ---------- */
+
+.modal-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 16, 22, 0.55);
+  display: grid;
+  place-items: center;
+  z-index: 9000;
+}
+.alert {
+  width: min(470px, 92vw);
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  box-shadow: 8px 8px 0 rgba(0, 0, 0, 0.5);
+  animation: slam 0.16s steps(3);
+}
+.alert.tone-bad { box-shadow: 8px 8px 0 rgba(211, 59, 45, 0.55); }
+.alert.tone-good { box-shadow: 8px 8px 0 rgba(47, 158, 87, 0.5); }
+.alertbody { display: flex; gap: 12px; padding: 12px; }
+.alerticon { flex: none; }
+.alerttext { flex: 1; }
+.alertactions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 0 12px 12px;
+}
+.summary { display: grid; gap: 1px; margin: 6px 0 0; }
+.summary div { display: flex; justify-content: space-between; gap: 12px; }
+.summary dt { color: var(--chrome-lo); }
+.summary dd { margin: 0; font-family: var(--font-stack-mono); font-size: 16px; }
+
+/* ---------- dock ---------- */
+
+.dock {
+  position: fixed;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  padding: 5px;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45);
+  z-index: 800;
+}
+.dockicon {
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  width: 58px;
+  padding: 4px 2px;
+  border: 2px solid transparent;
+  background: none;
+  font-size: 8px;
+  cursor: pointer;
+}
+.dockicon.open { border-color: var(--ink); background: var(--chrome); }
+.dockicon.attention { animation: bounce 0.7s steps(2) infinite; }
+
+/* ---------- utility ---------- */
+
+.muted { color: var(--chrome-lo); }
+.small { font-size: 8px; }
+.good { color: var(--green); }
+.bad { color: var(--red); }
+.warn { color: #a1740b; }
+.unknown { color: var(--chrome-lo); }
+.risk-low { color: var(--green); }
+.risk-medium { color: #a1740b; }
+.risk-high { color: var(--red); }
+
+/* ---------- animation ---------- */
+
+@keyframes blink { 50% { opacity: 0.25; } }
+@keyframes slam { from { transform: scale(0.88); } to { transform: scale(1); } }
+@keyframes bounce { 50% { transform: translateY(-4px); } }
+@keyframes shake {
+  10% { transform: translate(-4px, 1px); }
+  30% { transform: translate(4px, -2px); }
+  50% { transform: translate(-3px, 2px); }
+  70% { transform: translate(3px, 1px); }
+  90% { transform: translate(-2px, 0); }
+}
+.shake { animation: shake 0.5s steps(2) 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* Stack the desktop on small screens — a window manager needs a mouse. */
+@media (max-width: 1000px) {
+  html, body { overflow: auto; }
+  .desktop { display: flex; flex-direction: column; gap: 10px; padding: 30px 8px 96px; }
+  .win { position: static !important; width: auto !important; height: auto !important; }
+  .growbox { display: none; }
+  .dock { overflow-x: auto; max-width: 96vw; }
+}
+
+/* ---------- the commit block: the free read, styled like a git log entry ---------- */
+
+.commitblock {
+  margin: 0 0 8px;
+  padding: 5px 7px;
+  border-left: 3px solid var(--chrome-lo);
+  background: rgba(0, 0, 0, 0.04);
+}
+.commitmsg {
+  font-family: var(--font-stack-mono);
+  font-size: 16px;
+  line-height: 1.2;
+  margin: 0 0 2px;
+  word-break: break-word;
+}
+.commitmeta {
+  margin: 0;
+  font-size: 8px;
+  color: #5a5a52;
+}
+
+/* ---------- focus: the front window is the loud one ---------- */
+
+.win.focused { box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.5); }
+.win.blurred { box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.3); }
+.win.blurred .stripes { background: repeating-linear-gradient(to bottom, var(--chrome-lo) 0 1px, transparent 1px 3px); }
+.win.blurred .titlebar { color: var(--chrome-lo); }
+
+/* ---------- boot ---------- */
+
+.bootscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 9500;
+  background: var(--ink);
+  color: #9dffb0;
+  font-family: var(--font-stack-mono);
+  font-size: 17px;
+  line-height: 1.45;
+  padding: 40px 32px;
+  cursor: pointer;
+}
+.bootscreen p { margin: 0; white-space: pre; }
+.bootheader { font-family: var(--font-stack-ui); font-size: 12px; margin-bottom: 14px !important; }
+.bootok { color: var(--amber); margin-top: 10px !important; }
+
+/* ---------- slack toasts ---------- */
+
+.toasts {
+  position: fixed;
+  right: 12px;
+  bottom: 92px;
+  z-index: 850;
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+}
+.toast {
+  display: grid;
+  gap: 1px;
+  max-width: 250px;
+  padding: 5px 8px;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45);
+  font-size: 9px;
+  animation: slam 0.14s steps(3);
+}
+.toastchannel { color: var(--blue); }
+
+/* ---------- console prompt ---------- */
+
+.consolewrap { display: flex; flex-direction: column; height: 100%; }
+.console .stamp { color: #5f7a66; }
+.consoleform {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 5px;
+  background: var(--ink);
+  border-top: 1px solid #2c2c33;
+  font-family: var(--font-stack-mono);
+  font-size: 15px;
+}
+.consoleform input {
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: #9dffb0;
+  font: inherit;
+}
+.consoleform input::placeholder { color: #4d5c52; }
+
+/* ---------- small details ---------- */
+
+.nines { font-size: 14px; }
+.runtitle {
+  margin: 0 0 6px;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  color: var(--amber);
+}
