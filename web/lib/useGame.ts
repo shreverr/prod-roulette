@@ -23,7 +23,7 @@ export const DEPLOY_STAGES = [
 /** Occasionally CI makes you wait, which is both true to life and a free extra beat. */
 const CI_QUEUE_STAGE = "waiting for a free CI runner…";
 
-export type Toast = { id: number; channel: string; text: string };
+export type Toast = { id: number; at: string; channel: string; text: string };
 export type LogEntry = {
   id: number;
   at: string;
@@ -43,6 +43,7 @@ export function useGame() {
   const [stage, setStage] = useState<number | null>(null);
   const [log, setLog] = useState<LogEntry[]>([]);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [notifications, setNotifications] = useState<Toast[]>([]);
   const [stageLabel, setStageLabel] = useState<string | null>(null);
   const [queue, setQueue] = useState<Dialog[]>([]);
   const [shake, setShake] = useState(false);
@@ -61,7 +62,9 @@ export function useGame() {
 
   const toast = useCallback((channel: string, text: string) => {
     const id = logId.current++;
-    setToasts((prev) => [...prev, { id, channel, text }].slice(-3));
+    const notification = { id, at: clock.current, channel, text };
+    setToasts((prev) => [...prev, notification].slice(-3));
+    setNotifications((prev) => [...prev, notification]);
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 6000);
   }, []);
 
@@ -216,6 +219,8 @@ export function useGame() {
     initAudio();
     sfx.boot();
     setLog([]);
+    setToasts([]);
+    setNotifications([]);
     setQueue([]);
     const res = await fetch("/api/new", { method: "POST" }).then((r) => r.json());
     token.current = res.token;
@@ -304,7 +309,7 @@ export function useGame() {
         ? { kind: "offer" }
         : null);
 
-  return { view, busy, stage, stageLabel, log, toasts, dialog, shake, start, send, dismiss, say };
+  return { view, busy, stage, stageLabel, log, toasts, notifications, dialog, shake, start, send, dismiss, say };
 }
 
 /** Counts a number up or down so cash and users feel like meters, not labels. */

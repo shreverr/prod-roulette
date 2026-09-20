@@ -4,10 +4,13 @@ import { useEffect, useState } from "react";
 import { isMuted, setMuted, sfx } from "@/lib/sfx";
 
 export function MenuBar({
-  onNewRun, onAbout, clock,
+  onNewRun, onAbout, onNotifications, notificationsOpen, unreadNotifications, clock,
 }: {
   onNewRun: () => void;
   onAbout: () => void;
+  onNotifications: () => void;
+  notificationsOpen: boolean;
+  unreadNotifications: number;
   /** The game's clock, not the wall clock — so Friday evening means something. */
   clock: string;
 }) {
@@ -68,6 +71,21 @@ export function MenuBar({
       ])}
       <span className="menuspace" />
       <span className="clock">{mute ? "◌ " : "♪ "}{clock}</span>
+      <button
+        className={`notificationbutton${notificationsOpen ? " active" : ""}`}
+        onClick={() => {
+          sfx.click();
+          onNotifications();
+        }}
+        aria-label="Notification Center"
+        aria-expanded={notificationsOpen}
+        title="Notification Center"
+      >
+        <span aria-hidden>▤</span>
+        {unreadNotifications > 0 ? (
+          <span className="notificationbadge">{Math.min(unreadNotifications, 99)}</span>
+        ) : null}
+      </button>
     </nav>
   );
 }

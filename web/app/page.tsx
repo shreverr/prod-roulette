@@ -26,9 +26,11 @@ const WINDOWS = [
 type Id = (typeof WINDOWS)[number]["id"];
 
 export default function Page() {
-  const { view, busy, stage, stageLabel, log, toasts, dialog, shake, start, send, dismiss, say } = useGame();
+  const { view, busy, stage, stageLabel, log, toasts, notifications, dialog, shake, start, send, dismiss, say } = useGame();
   const [about, setAbout] = useState(false);
   const [booting, setBooting] = useState<number | null>(null);
+  const [notificationCenterOpen, setNotificationCenterOpen] = useState(false);
+  const [lastReadNotification, setLastReadNotification] = useState(-1);
 
   const [pos, setPos] = useState<Record<Id, WinPos>>(() =>
     Object.fromEntries(
@@ -63,6 +65,20 @@ export default function Page() {
       cash: [...h.cash, view.cash].slice(-40),
     }));
   }, [view]);
+
+  useEffect(() => {
+    if (!notificationCenterOpen || notifications.length === 0) return;
+    setLastReadNotification(notifications[notifications.length - 1].id);
+  }, [notificationCenterOpen, notifications]);
+
+  useEffect(() => {
+    if (!notificationCenterOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setNotificationCenterOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [notificationCenterOpen]);
 
   /** A: the boot sequence. Plays on every load, so the skip has to actually cut it short —
    *  a ref, not state, because the loop below reads it between awaits. */
@@ -210,10 +226,40 @@ export default function Page() {
   return (
     <div className="desktop">
       <MenuBar
-        onNewRun={() => void start()}
+        onNewRun={() => {
+          setNotificationCenterOpen(false);
+          void start();
+        }}
         onAbout={() => setAbout(true)}
+        onNotifications={() => setNotificationCenterOpen((open) => !open)}
+        notificationsOpen={notificationCenterOpen}
+        unreadNotifications={notifications.filter((notification) => notification.id > lastReadNotification).length}
         clock={view ? clockLabel(view.clock) : "Mon 09:12"}
       />
+
+      {notificationCenterOpen ? (
+        <aside className="notificationcenter" aria-label="Notification Center">
+          <header className="notificationheader">
+            <strong>NOTIFICATION CENTER</strong>
+            <button onClick={() => setNotificationCenterOpen(false)} aria-label="Close Notification Center">×</button>
+          </header>
+          <div className="notificationlist">
+            {notifications.length ? (
+              [...notifications].reverse().map((notification) => (
+                <article className="notificationitem" key={notification.id}>
+                  <div>
+                    <span className="notificationchannel">{notification.channel}</span>
+                    <time>{notification.at}</time>
+                  </div>
+                  <p>{notification.text}</p>
+                </article>
+              ))
+            ) : (
+              <p className="notificationempty">No notifications yet.</p>
+            )}
+          </div>
+        </aside>
+      ) : null}
 
       {view ? (
         <>

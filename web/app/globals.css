@@ -60,6 +60,34 @@ p { margin: 0 0 4px; }
 .menubar .logo { font-size: 12px; padding-right: 4px; }
 .menubar .menuspace { flex: 1; }
 .menubar .clock { font-family: var(--font-stack-mono); font-size: 14px; letter-spacing: 1px; }
+.notificationbutton {
+  position: relative;
+  width: 24px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 18px;
+  cursor: pointer;
+}
+.notificationbutton:hover, .notificationbutton.active { background: var(--ink); color: var(--chrome-hi); }
+.notificationbadge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 13px;
+  height: 13px;
+  padding: 0 3px;
+  border: 1px solid var(--ink);
+  border-radius: 7px;
+  background: var(--red);
+  color: white;
+  font-family: var(--font-stack-mono);
+  font-size: 9px;
+  line-height: 11px;
+}
 
 /* the settled-slots strip in queue.mon */
 .queuestrip { display: flex; gap: 6px; font-size: 18px; margin: 6px 0 8px !important; }
@@ -477,6 +505,55 @@ p { margin: 0 0 4px; }
 .bootprompt { margin-top: 18px !important; animation: blink 1.1s steps(2) infinite; }
 
 /* ---------- slack toasts ---------- */
+
+.notificationcenter {
+  position: fixed;
+  top: 22px;
+  right: 0;
+  z-index: 900;
+  width: min(330px, calc(100vw - 16px));
+  max-height: calc(100vh - 38px);
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  border-top: 0;
+  box-shadow: -6px 6px 0 rgba(0, 0, 0, 0.4);
+}
+.notificationheader {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 27px;
+  padding: 3px 5px 3px 9px;
+  border-bottom: 2px solid var(--ink);
+  background: var(--chrome);
+}
+.notificationheader button {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 2px solid var(--ink);
+  background: var(--paper);
+  font-size: 15px;
+  line-height: 14px;
+  cursor: pointer;
+}
+.notificationheader button:hover { background: var(--red); color: white; }
+.notificationlist { overflow-y: auto; padding: 7px; }
+.notificationitem {
+  padding: 7px 8px;
+  border: 2px solid var(--ink);
+  background: var(--chrome-hi);
+  box-shadow: 3px 3px 0 var(--chrome-lo);
+}
+.notificationitem + .notificationitem { margin-top: 7px; }
+.notificationitem > div { display: flex; justify-content: space-between; gap: 8px; }
+.notificationitem time { color: var(--chrome-lo); font-family: var(--font-stack-mono); font-size: 12px; }
+.notificationitem p { margin: 2px 0 0; line-height: 1.45; }
+.notificationchannel { color: var(--blue); font-weight: bold; }
+.notificationempty { margin: 12px; text-align: center; color: var(--chrome-lo); }
 
 .toasts {
   position: fixed;
