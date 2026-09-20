@@ -13,6 +13,8 @@
   --red: #d33b2d;
   --amber: #e0a41f;
   --blue: #4a7fd4;
+  /* dock height + its 8px offset — what the layout has to stay clear of */
+  --dock-space: 80px;
   --font-stack-ui: var(--font-ui), "Courier New", monospace;
   --font-stack-mono: var(--font-mono), "Courier New", monospace;
 }
@@ -464,11 +466,24 @@ p { margin: 0 0 4px; }
 /* Stack the desktop on small screens — a window manager needs a mouse. */
 @media (max-width: 1000px) {
   html, body { overflow: auto; }
-  .desktop { display: flex; flex-direction: column; gap: 10px; padding: 30px 8px 96px; }
+  /* height: 100% from the desktop layout would cap the column at one viewport and let
+     flex squash the items at the end of it — the dock, mostly. */
+  .desktop {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    /* The dock floats over the bottom of the column, so the column ends above it. */
+    padding: 30px 8px calc(var(--dock-space) + 24px);
+    height: auto;
+    min-height: 100%;
+  }
+  .win, .dock { flex: none; }
+  /* Focusing the console prompt must not scroll it under the dock. */
+  html { scroll-padding-bottom: calc(var(--dock-space) + 24px); }
+  .dock { overflow-x: auto; max-width: 96vw; }
   .win { position: static !important; width: auto !important; height: auto !important; }
   .consolewrap { height: min(220px, 45vh); }
   .growbox { display: none; }
-  .dock { overflow-x: auto; max-width: 96vw; }
 }
 
 /* ---------- the commit block: the free read, styled like a git log entry ---------- */

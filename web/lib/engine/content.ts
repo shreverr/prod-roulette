@@ -281,7 +281,7 @@ export const UPGRADES: Record<UpgradeId, { name: string; price: number; blurb: s
   db_replica: { name: "Database replica", price: 500_000, blurb: "incident cash loss halved. the replica is quietly also on fire." },
   feature_flags: { name: "Feature flags", price: 600_000, blurb: "once a sprint: make this deployment safe. you will forget to remove it." },
   sre_hire: { name: "Hire an SRE", price: 700_000, blurb: "+1 max uptime. they will ask about runbooks." },
-  blue_green: { name: "Blue/green deploys", price: 900_000, blurb: "rollback never fails" },
+  blue_green: { name: "Blue/green deploys", price: 1_200_000, blurb: "rollback almost never fails. almost." },
 };
 
 export const ITEM_IDS = Object.keys(ITEMS) as ItemId[];
@@ -406,47 +406,44 @@ export const BOOT_LINES: [string, string][] = [
  *  copy so the numbers stay next to the flavor they describe. */
 export const MANUAL: [string, string[]][] = [
   ["the queue", [
-    "Every sprint queues 4-8 deployments. A fixed number of them take prod down.",
-    "That count is announced. The order is not \u2014 it is shuffled, and the count is always exactly true.",
-    "You work the queue one deployment at a time. You cannot skip ahead.",
+    "Every sprint queues a handful of deployments. Some of them take prod down.",
+    "How many is announced. Which ones is not.",
+    "You work the queue one at a time, in order.",
   ]],
   ["uptime", [
     "Your lives. Every incident you fail to contain costs one.",
     "At zero, prod is gone and the run is over.",
-    "Clear a sprint and you sometimes get one back overnight \u2014 rarer past sprint 8.",
+    "Clear a sprint and you might get one back overnight.",
   ]],
   ["deploy", [
-    "Ships the deployment in front of you.",
+    "Ships whatever is in front of you.",
     "Safe: revenue and new users. Dangerous: an incident, and a choice.",
-    "Rollback works 55% of the time, hotfix 40% (and costs an extra uptime when it fails),",
-    "waiting it out 30% (and costs half again as much cash when it fails).",
-    "Shipping with no information at all pays 1.5x. Recklessness is a strategy, not a bug.",
+    "Rolling back usually works. Hotfixes rarely do. Waiting it out is a prayer.",
+    "Shipping blind pays more. Recklessness is a strategy, not a bug.",
   ]],
   ["staging", [
-    "Burns one velocity token to push the deployment through staging instead of prod.",
-    "Dangerous: you dodged it. Safe: you lose a third of a sprint's revenue for the delay.",
-    "Either way the slot is gone and the queue moves on \u2014 which is the real reason to use it.",
+    "Burns a velocity token to route the deployment away from prod.",
+    "Dangerous: you dodged it. Safe: you paid for the delay.",
+    "Either way the slot is gone, which is the real reason to use it.",
   ]],
   ["velocity", [
-    "Staging tokens. Refilled every sprint, 1-4 depending on what you inherited.",
-    "Nothing else spends them. Running out means the rest of the queue goes to prod.",
+    "Staging tokens. Refilled every sprint, and nothing else spends them.",
+    "Out of tokens means the rest of the queue goes to prod.",
   ]],
   ["tools", [
-    "Two drawn at the start of every sprint, two more when you clear it. You hold four (six with observability).",
-    "Each is one use. Some buy information, some change the deployment, one is a coin flip.",
+    "Drawn at the start of a sprint and again when you clear it.",
+    "Each is one use. Most buy information, some change the deployment.",
     "Information is the whole game: the queue is countable once you know what is behind you.",
   ]],
   ["cash", [
     "Revenue in, incidents out. Payroll clears at the end of each sprint.",
-    "End a sprint below zero and the run ends insolvent, however good the uptime looked.",
+    "End one underwater and the run is over, however good the uptime looked.",
   ]],
   ["the exit", [
-    "Acquirers watch cumulative revenue, not cash on hand, so buying tooling never delays your exit.",
-    "Cross the bar and an offer arrives at a multiple: 1.5x, then 2.5x, 4x, 6x, 9x.",
-    "Sign and the run ends banked. Decline and the next offer is worth more \u2014 but every",
-    "sprint after it carries an extra disaster, up to two.",
-    "Lose instead, and an acqui-hire offer arrives anyway: 4% of lifetime revenue for the",
-    "domain, the laptops and whoever is still answering email. You take it.",
+    "Acquirers watch revenue, not cash, so buying tooling never delays your exit.",
+    "Earn enough and an offer arrives. Sign it and the run ends banked.",
+    "Decline and the next one is worth more, but every sprint after it gets deadlier.",
+    "Lose instead and someone still buys the wreckage. For much less.",
   ]],
 ];
 

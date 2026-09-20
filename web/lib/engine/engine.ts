@@ -358,7 +358,12 @@ export function resolveIncident(
     ok = true;
     loss = Math.trunc(loss / 3);
   } else if (choice === "rollback") {
-    const p = has(g, "blue_green") ? 1.0 : 0.55 + (has(g, "automated_rollback") ? 0.30 : 0);
+    // Blue/green is the best rollback money buys, not a promise — a guaranteed one made
+    // uptime impossible to lose and the run with it.
+    const p = Math.min(
+      0.95,
+      (has(g, "blue_green") ? 0.90 : 0.55) + (has(g, "automated_rollback") ? 0.30 : 0),
+    );
     ok = rng.random() < p;
     if (ok) {
       damage = 0;

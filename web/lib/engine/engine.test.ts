@@ -125,17 +125,39 @@ describe("deploying", () => {
 });
 
 describe("incident response", () => {
-  it("never fails a rollback with blue/green", () => {
+  it("makes rollbacks reliable with blue/green, but not certain", () => {
     const g = game(7, { upgrades: ["blue_green"] });
-    for (let k = 0; k < 30; k++) {
+    let failed = 0;
+    for (let k = 0; k < 200; k++) {
       at(g, badIndex(g));
       g.pending = null;
       apply(g, { kind: "deploy" });
       const ev = apply(g, { kind: "incident", choice: "rollback" });
-      expect((ev.find((e) => e.t === "incident:result") as any).ok).toBe(true);
+      if (!(ev.find((e) => e.t === "incident:result") as any).ok) failed += 1;
       g.uptime = 4;        // keep the run alive for the next iteration
       g.users = 12_482;    // ...and out of an exodus
     }
+    // ~10% of the time it does not come back, which is what keeps the run losable.
+    expect(failed).toBeGreaterThan(4);
+    expect(failed).toBeLessThan(40);
+  });
+
+  it("still leaves blue/green the best rollback on the board", () => {
+    const rate = (upgrades: UpgradeId[]) => {
+      const g = game(11, { upgrades });
+      let ok = 0;
+      for (let k = 0; k < 200; k++) {
+        at(g, badIndex(g));
+        g.pending = null;
+        apply(g, { kind: "deploy" });
+        if ((apply(g, { kind: "incident", choice: "rollback" }).find((e) => e.t === "incident:result") as any).ok) ok += 1;
+        g.uptime = 4;
+        g.users = 12_482;
+      }
+      return ok;
+    };
+    expect(rate(["blue_green"])).toBeGreaterThan(rate(["automated_rollback"]));
+    expect(rate(["automated_rollback"])).toBeGreaterThan(rate([]));
   });
 
   it("lets the canary absorb only the first disaster of a round", () => {
@@ -542,12 +564,11 @@ describe("two ways to lose", () => {
       if ((g.phase as string) !== "incident") break;   // apply() mutates phase; TS cannot see it
       const ev = apply(g, { kind: "incident", choice: "rollback" });
       const res = ev.find((e) => e.t === "incident:result") as any;
-      expect(res.ok).toBe(true);
-      expect(res.damage).toBe(0);        // the rollback always works
-      bled += res.loss;                  // ...and it is never free
+      if (res.ok) expect(res.damage).toBe(0);   // when it works, it costs no uptime
+      bled += res.loss;                         // ...and it is never free
       g.queue.slots[bad].bad = true;     // reload the same disaster
     }
-    expect(g.uptime).toBe(4);                    // never took an uptime hit
+    expect(g.uptime).toBeLessThanOrEqual(4);
     expect(bled).toBeGreaterThan(0);             // still paid every time
     expect(g.users).toBeLessThan(startUsers);    // still bled users
   });
