@@ -190,6 +190,18 @@ export function useGame() {
             );
             break;
 
+          case "firesale":
+            sfx.offer();
+            say(
+              e.amount > 0
+                ? `someone offered ${inr(e.amount)} for the domain, the laptops and whoever is left.`
+                : "nobody bid. not even for the domain.",
+              "bad",
+              "investor",
+            );
+            await wait(120);
+            break;
+
           case "over":
             if (e.outcome === "acquired") sfx.acquired();
             else sfx.over();

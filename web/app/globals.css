@@ -99,6 +99,7 @@ p { margin: 0 0 4px; }
 .queuestrip b.here { color: var(--ink); animation: blink 1.1s steps(2) infinite; }
 .queuestrip b.unknown { opacity: 0.3; }
 
+.shareactions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
 .sharebox {
   width: 100%; margin-top: 8px; padding: 6px;
   font-family: var(--font-stack-mono); font-size: 13px; line-height: 1.4;
@@ -395,6 +396,9 @@ p { margin: 0 0 4px; }
 .summary div { display: contents; }
 .summary dt { color: var(--chrome-lo); }
 .summary dd { margin: 0; font-family: var(--font-stack-mono); font-size: 16px; }
+.manual { display: grid; gap: 7px; margin: 8px 0 10px; max-height: 50vh; overflow-y: auto; }
+.manual dt { color: var(--chrome-lo); text-transform: uppercase; letter-spacing: 0.5px; }
+.manual dd { margin: 2px 0 0; font-family: var(--font-stack-mono); font-size: 15px; line-height: 1.25; }
 .credit { margin: 10px 0 0; padding-top: 6px; border-top: 2px solid var(--chrome); color: var(--chrome-lo); }
 .credit a { color: var(--ink); text-decoration: underline; }
 

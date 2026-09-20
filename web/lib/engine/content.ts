@@ -402,6 +402,54 @@ export const BOOT_LINES: [string, string][] = [
   ["loading feature flags", "1,204 (none removed)"],
 ];
 
+/** The rules, in the order a new player runs into them. Kept here with the rest of the
+ *  copy so the numbers stay next to the flavor they describe. */
+export const MANUAL: [string, string[]][] = [
+  ["the queue", [
+    "Every sprint queues 4-8 deployments. A fixed number of them take prod down.",
+    "That count is announced. The order is not \u2014 it is shuffled, and the count is always exactly true.",
+    "You work the queue one deployment at a time. You cannot skip ahead.",
+  ]],
+  ["uptime", [
+    "Your lives. Every incident you fail to contain costs one.",
+    "At zero, prod is gone and the run is over.",
+    "Clear a sprint and you sometimes get one back overnight \u2014 rarer past sprint 8.",
+  ]],
+  ["deploy", [
+    "Ships the deployment in front of you.",
+    "Safe: revenue and new users. Dangerous: an incident, and a choice.",
+    "Rollback works 55% of the time, hotfix 40% (and costs an extra uptime when it fails),",
+    "waiting it out 30% (and costs half again as much cash when it fails).",
+    "Shipping with no information at all pays 1.5x. Recklessness is a strategy, not a bug.",
+  ]],
+  ["staging", [
+    "Burns one velocity token to push the deployment through staging instead of prod.",
+    "Dangerous: you dodged it. Safe: you lose a third of a sprint's revenue for the delay.",
+    "Either way the slot is gone and the queue moves on \u2014 which is the real reason to use it.",
+  ]],
+  ["velocity", [
+    "Staging tokens. Refilled every sprint, 1-4 depending on what you inherited.",
+    "Nothing else spends them. Running out means the rest of the queue goes to prod.",
+  ]],
+  ["tools", [
+    "Two drawn at the start of every sprint, two more when you clear it. You hold four (six with observability).",
+    "Each is one use. Some buy information, some change the deployment, one is a coin flip.",
+    "Information is the whole game: the queue is countable once you know what is behind you.",
+  ]],
+  ["cash", [
+    "Revenue in, incidents out. Payroll clears at the end of each sprint.",
+    "End a sprint below zero and the run ends insolvent, however good the uptime looked.",
+  ]],
+  ["the exit", [
+    "Acquirers watch cumulative revenue, not cash on hand, so buying tooling never delays your exit.",
+    "Cross the bar and an offer arrives at a multiple: 1.5x, then 2.5x, 4x, 6x, 9x.",
+    "Sign and the run ends banked. Decline and the next offer is worth more \u2014 but every",
+    "sprint after it carries an extra disaster, up to two.",
+    "Lose instead, and an acqui-hire offer arrives anyway: 4% of lifetime revenue for the",
+    "domain, the laptops and whoever is still answering email. You take it.",
+  ]],
+];
+
 export const ABOUT_LINES: [string, string][] = [
   ["Series", "Seed"],
   ["Engineers", "3 (2 on notice)"],

@@ -40,6 +40,8 @@ export type View = {
   offer: { amount: number; multiplier: number; declined: number } | null;
   outcome: Outcome | null;
   score: number;
+  /** What the wreckage sold for. 0 until a run ends badly. */
+  fireSale: number;
   earned: number;
   clock: { day: number; hour: number; minute: number };
   sprintName: string;
@@ -129,7 +131,8 @@ export function project(g: GameState): View {
           diedOnFriday: g.outcome !== "acquired" && g.lastDoubled,
         })
       : null,
-    score: g.outcome === "acquired" ? (g.pendingOffer ?? g.cash) : g.cash,
+    score: g.outcome === "acquired" ? (g.pendingOffer ?? g.cash) : g.cash + g.fireSale,
+    fireSale: g.fireSale,
     stats: {
       deploys: g.deploys,
       recklessDeploys: g.recklessDeploys,

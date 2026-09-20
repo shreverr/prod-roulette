@@ -8,7 +8,7 @@ import type { View } from "@/lib/engine/view";
 import { useAnimatedNumber, type LogEntry } from "@/lib/useGame";
 import { PixelChart } from "../pixel/PixelChart";
 import { Sprite } from "../pixel/Sprite";
-import { CHECK, MAGNIFIER, WARNING } from "../pixel/sprites";
+import { CHECK, COIN, MAGNIFIER, SKULL, WARNING, type PixelMap } from "../pixel/sprites";
 
 export type Log = LogEntry[];
 
@@ -180,7 +180,7 @@ export function MetricsPanel({
   return (
     <>
       <div className="meter">
-        <span className="label">UPTIME</span>
+        <span className="label" title="outages you can still absorb. at zero the run ends.">UPTIME</span>
         <b className={`vt nines${view.uptime <= 1 ? " bad" : ""}`}>
           {NINES[Math.min(view.uptime, NINES.length - 1)]}
         </b>
@@ -193,22 +193,22 @@ export function MetricsPanel({
 
       <div className="readouts">
         <div>
-          <span className="label">USERS</span>
+          <span className="label" title="every incident churns some away. bigger user base, bigger revenue.">USERS</span>
           <b className="vt">{users.toLocaleString("en-IN")}</b>
         </div>
         <div>
-          <span className="label">CASH</span>
+          <span className="label" title="payroll clears at the end of each sprint. below zero then, the run ends insolvent.">CASH</span>
           <b className={`vt ${cash < 0 ? "bad" : "good"}`}>{inr(cash)}</b>
         </div>
         <div>
-          <span className="label">VELOCITY</span>
+          <span className="label" title="staging skips left this sprint. only STAGING spends them.">VELOCITY</span>
           <b className="vt">
             {"◆".repeat(view.velocity)}
             {"◇".repeat(Math.max(0, view.maxVelocity - view.velocity))}
           </b>
         </div>
         <div>
-          <span className="label">SPRINT</span>
+          <span className="label" title="each sprint is one queue of deployments. later sprints queue more, and more of them are disasters.">SPRINT</span>
           <b className="vt">{view.round}</b>
         </div>
       </div>
@@ -411,34 +411,210 @@ export function GameOverPanel({ view }: { view: View }) {
 
   const [fallback, setFallback] = useState<string | null>(null);
 
+  const rows: [string, string, string?][] = [
+    ["sprints survived", String(view.round - 1)],
+    ["deployments", String(view.stats.deploys)],
+    ["incidents", String(view.stats.incidents), "bad"],
+    ["reckless deploys", String(view.stats.recklessDeploys), "warn"],
+    ["users remaining", view.users.toLocaleString("en-IN")],
+    ["revenue earned", inr(view.earned)],
+    ["final cash", inr(view.cash), view.cash < 0 ? "bad" : "good"],
+    ["tooling bought", `${view.upgrades.length}/${view.shop.length}`],
+    ["shipped to staging", String(view.stats.staged)],
+    ["tools spent", String(view.stats.toolsUsed)],
+    view.outcome === "acquired"
+      ? ["sale price", inr(view.score), "good"]
+      : ["fire sale", inr(view.fireSale), "warn"],
+  ];
+  if (view.outcome !== "acquired") rows.push(["walked away with", inr(view.score)]);
+
+  const saveImage = async () => {
+    const acquired = view.outcome === "acquired";
+    const blob = await shareCard({
+      windowTitle: acquired ? "acquired" : "run over",
+      icon: acquired ? COIN : view.outcome === "insolvent" ? WARNING : SKULL,
+      headline:
+        acquired ? `sold for ${inr(view.score)}`
+          : view.outcome === "insolvent" ? "out of runway"
+            : "production is down",
+      subtitle:
+        acquired ? "You got out. Someone else owns the pager now."
+          : view.outcome === "insolvent" ? "Payroll came due and the account was empty."
+            : "Uptime hit zero. Nobody can reach the site.",
+      aside: acquired
+        ? null
+        : view.fireSale > 0
+          ? `An acqui-hire offer came in for ${inr(view.fireSale)}. You took it.`
+          : "No offer came in. Not even for the domain.",
+      company: view.company.name,
+      title: view.title,
+      rows,
+    });
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `prod-roulette-${view.company.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.png`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <>
       {view.title ? <p className="runtitle">“{view.title}”</p> : null}
       <dl className="summary">
-      <div><dt>sprints survived</dt><dd>{view.round - 1}</dd></div>
-      <div><dt>deployments</dt><dd>{view.stats.deploys}</dd></div>
-      <div><dt>incidents</dt><dd className="bad">{view.stats.incidents}</dd></div>
-      <div><dt>reckless deploys</dt><dd className="warn">{view.stats.recklessDeploys}</dd></div>
-      <div><dt>users remaining</dt><dd>{view.users.toLocaleString("en-IN")}</dd></div>
-      <div><dt>revenue earned</dt><dd>{inr(view.earned)}</dd></div>
-      <div><dt>final cash</dt><dd className={view.cash < 0 ? "bad" : "good"}>{inr(view.cash)}</dd></div>
-      <div><dt>tooling bought</dt><dd>{view.upgrades.length}/{view.shop.length}</dd></div>
-      <div><dt>shipped to staging</dt><dd>{view.stats.staged}</dd></div>
-      <div><dt>tools spent</dt><dd>{view.stats.toolsUsed}</dd></div>
-      <div>
-        <dt>{view.outcome === "acquired" ? "sale price" : "walked away with"}</dt>
-        <dd className={view.outcome === "acquired" ? "good" : ""}>{inr(view.score)}</dd>
-      </div>
+        {rows.map(([label, value, tone]) => (
+          <div key={label}>
+            <dt>{label}</dt>
+            <dd className={tone ?? ""}>{value}</dd>
+          </div>
+        ))}
       </dl>
 
-      <button className="btn" onClick={() => void copy()}>
-        {copied ? "COPIED" : "COPY RESULT"}
-      </button>
+      <div className="shareactions">
+        <button className="btn" onClick={() => void copy()}>
+          {copied ? "COPIED" : "COPY RESULT"}
+        </button>
+        <button className="btn" onClick={() => void saveImage()}>SAVE IMAGE</button>
+      </div>
       {fallback ? (
         <textarea className="sharebox" readOnly rows={6} value={fallback} onFocus={(e) => e.currentTarget.select()} />
       ) : null}
     </>
   );
+}
+
+/** Renders the game-over window as a PNG — same chrome, palette and fonts as the desktop,
+ *  so a saved result looks like the thing that was on screen. */
+async function shareCard({
+  windowTitle, headline, subtitle, aside, company, title, rows, icon,
+}: {
+  windowTitle: string;
+  headline: string;
+  subtitle: string;
+  aside: string | null;
+  company: string;
+  title: string | null;
+  rows: [string, string, string?][];
+  icon: PixelMap;
+}): Promise<Blob | null> {
+  await document.fonts.ready;
+  const css = getComputedStyle(document.documentElement);
+  const v = (name: string) => css.getPropertyValue(name).trim();
+  const ui = v("--font-stack-ui") || "monospace";
+  const mono = v("--font-stack-mono") || "monospace";
+  const ink = v("--ink"), paper = v("--paper"), muted = v("--chrome-lo");
+  const tones: Record<string, string> = { bad: v("--red"), warn: v("--amber"), good: v("--green") };
+
+  const S = 3, W = 520, PAD = 20, BAR = 24, ROW = 26, VALUE_X = 250, ICON = 4 * 12;
+
+  const c = document.createElement("canvas");
+  const measureCtx = c.getContext("2d");
+  if (!measureCtx) return null;
+  /** Greedy wrap at `font`, so the copy lines up the way the dialog wraps it. */
+  const wrap = (text: string, font: string, width: number) => {
+    measureCtx.font = font;
+    const out: string[] = [];
+    let line = "";
+    for (const word of text.split(" ")) {
+      const next = line ? `${line} ${word}` : word;
+      if (line && measureCtx.measureText(next).width > width) {
+        out.push(line);
+        line = word;
+      } else line = next;
+    }
+    if (line) out.push(line);
+    return out;
+  };
+
+  const bodyW = W - PAD * 2 - ICON - 14;
+  const subLines = wrap(subtitle, `12px ${ui}`, bodyW);
+  const asideLines = aside ? wrap(aside, `12px ${ui}`, bodyW) : [];
+  const headH = 26 + subLines.length * 17 + (title ? 22 : 0) + asideLines.length * 17;
+  const H = BAR + PAD + headH + 4 + rows.length * ROW + 22 + PAD;
+
+  c.width = W * S;
+  c.height = H * S;
+  const ctx = c.getContext("2d");
+  if (!ctx) return null;
+  ctx.scale(S, S);
+  ctx.textBaseline = "alphabetic";
+
+  // window: paper body, ink frame, striped titlebar
+  ctx.fillStyle = paper;
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = ink;
+  ctx.fillRect(0, BAR - 2, W, 2);
+  ctx.font = `12px ${ui}`;
+  const titleW = ctx.measureText(windowTitle.toUpperCase()).width + 12;
+  const stripeL = 22, stripeR = (W - titleW) / 2;
+  for (let y = 6; y < BAR - 5; y += 3) {
+    ctx.fillRect(stripeL, y, stripeR - stripeL - 4, 1);
+    ctx.fillRect(stripeR + titleW + 4, y, W - 22 - (stripeR + titleW + 4), 1);
+  }
+  ctx.strokeStyle = muted;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(7, BAR / 2 - 5, 10, 10);   // the dead closebox, as on screen
+  ctx.fillStyle = ink;
+  ctx.fillText(windowTitle.toUpperCase(), stripeR + 6, BAR / 2 + 4);
+
+  // the alert icon, painted a pixel at a time like every other sprite
+  const cell = ICON / icon.map.length;
+  icon.map.forEach((line, y) => {
+    [...line].forEach((ch, x) => {
+      const color = icon.palette[ch];
+      if (!color) return;
+      ctx.fillStyle = color;
+      ctx.fillRect(PAD + x * cell, BAR + PAD + y * cell, cell, cell);
+    });
+  });
+
+  const x = PAD + ICON + 14;
+  let y = BAR + PAD + 14;
+  ctx.font = `16px ${ui}`;
+  ctx.fillStyle = ink;
+  ctx.fillText(headline.toUpperCase(), x, y);
+  ctx.font = `12px ${ui}`;
+  ctx.fillStyle = muted;
+  for (const line of subLines) {
+    y += 17;
+    ctx.fillText(line.toUpperCase(), x, y);
+  }
+  if (title) {
+    y += 22;
+    ctx.fillStyle = tones.warn;
+    ctx.fillText(`"${title.toUpperCase()}"`, x, y);
+  }
+  ctx.fillStyle = tones.warn;
+  for (const line of asideLines) {
+    y += 17;
+    ctx.fillText(line.toUpperCase(), x, y);
+  }
+
+  y += 4;
+  for (const [label, value, tone] of rows) {
+    y += ROW;
+    ctx.font = `11px ${ui}`;
+    ctx.fillStyle = muted;
+    ctx.fillText(label.toUpperCase(), PAD, y);
+    ctx.font = `20px ${mono}`;
+    ctx.fillStyle = tone ? tones[tone] ?? ink : ink;
+    ctx.fillText(value, VALUE_X, y);
+  }
+
+  y += 22;
+  ctx.font = `10px ${ui}`;
+  ctx.fillStyle = muted;
+  ctx.fillText(company.toUpperCase(), PAD, y);
+  ctx.textAlign = "right";
+  ctx.fillText("PROD ROULETTE \u00b7 @SHREVERRR & @SHIVAMBAJPAI04", W - PAD, y);
+  ctx.textAlign = "left";
+
+  ctx.strokeStyle = ink;
+  ctx.lineWidth = 4;
+  ctx.strokeRect(2, 2, W - 4, H - 4);
+
+  return new Promise((resolve) => c.toBlob(resolve, "image/png"));
 }
 
 export { WARNING };

@@ -4,10 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { isMuted, setMuted, sfx } from "@/lib/sfx";
 
 export function MenuBar({
-  onNewRun, onAbout, onNotifications, notificationsOpen, unreadNotifications, clock,
+  onNewRun, onAbout, onHelp, onNotifications, notificationsOpen, unreadNotifications, clock,
 }: {
   onNewRun: () => void;
   onAbout: () => void;
+  onHelp: () => void;
   onNotifications: () => void;
   notificationsOpen: boolean;
   unreadNotifications: number;
@@ -80,6 +81,7 @@ export function MenuBar({
       </svg>
       {menu("PRODOS", [
         { label: "About this startup", onClick: onAbout },
+        { label: "How to play", onClick: onHelp },
         { label: "New run", onClick: onNewRun },
       ])}
       {menu("Sound", [

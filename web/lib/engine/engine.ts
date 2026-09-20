@@ -45,6 +45,10 @@ export const userFactor = (g: GameState) =>
  *  rather than a guaranteed death. */
 export const MAX_DECLINE_HEAT = 2;
 
+/** Nobody buys a dead product. Someone always buys the laptops, the domain and the
+ *  remaining engineers — for a fraction of what the business ever earned. */
+export const FIRE_SALE_RATE = 0.04;
+
 /** Acquisition multiple, one rung per declined offer. */
 export const MULTIPLIERS = [1.5, 2.5, 4, 6, 9];
 export const multiplierFor = (declined: number) =>
@@ -620,7 +624,15 @@ function buy(g: GameState, id: UpgradeId, ev: GameEvent[]): void {
 function finish(g: GameState, outcome: Outcome, ev: GameEvent[], amount?: number): void {
   g.phase = "over";
   g.outcome = outcome;
-  const score = outcome === "acquired" ? (amount ?? g.cash) : g.cash;
+  if (outcome !== "acquired") {
+    // The insulting offer that always arrives the week after: a fraction of lifetime
+    // revenue, floored at zero so a run that never earned anything sells for nothing.
+    g.fireSale = Math.max(0, Math.trunc(g.earned * FIRE_SALE_RATE));
+    ev.push({ t: "firesale", amount: g.fireSale, rate: FIRE_SALE_RATE });
+  }
+  // The salvage rides on top of the books rather than into them: a run that went insolvent
+  // stays insolvent on the cash line, and still walks away with the pittance.
+  const score = outcome === "acquired" ? (amount ?? g.cash) : g.cash + g.fireSale;
   ev.push({ t: "over", outcome, score });
 }
 
@@ -671,6 +683,7 @@ export function newGame(seed?: number, company?: CompanyId): { state: GameState;
     clock: { day: 0, hour: 9, minute: 12 },
     sprintName: SPRINT_NAMES[0],
     staged: 0,
+    fireSale: 0,
     toolsUsed: 0,
     lastDoubled: false,
     offersDeclined: 0,

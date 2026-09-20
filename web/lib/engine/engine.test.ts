@@ -5,7 +5,8 @@ import {
   UPGRADE_IDS, WEEK, type UpgradeId,
 } from "./content";
 import {
-  apply, bake, baseRevenue, buildTuning, drawItems, FIRST_OFFER, handCap, MAX_DECLINE_HEAT,
+  apply, bake, baseRevenue, buildTuning, drawItems, FIRE_SALE_RATE, FIRST_OFFER, handCap,
+  MAX_DECLINE_HEAT,
   maxVelocity, multiplierFor, newGame, queueSpec, SIGNAL_STRENGTH,
 } from "./engine";
 import { CHANNELS, measure, readDanger, type Free } from "./calibrate";
@@ -499,6 +500,32 @@ describe("two ways to lose", () => {
     apply(g, { kind: "deploy" });
     expect(g.phase).toBe("over");
     expect(g.outcome).toBe("insolvent");
+  });
+
+  it("sells the wreckage for a fraction of lifetime revenue", () => {
+    const g = badFirst(game(3));
+    g.users = 1;
+    g.earned = 10_000_000;
+    const cash = g.cash;
+    const ev = [...apply(g, { kind: "deploy" }), ...apply(g, { kind: "incident", choice: "wait" })];
+    expect(g.outcome).toBe("insolvent");
+    expect(g.fireSale).toBe(Math.trunc(10_000_000 * FIRE_SALE_RATE));
+    const sale = ev.find((e) => e.t === "firesale") as { amount: number };
+    expect(sale.amount).toBe(g.fireSale);
+    // The salvage never touches the books — it only shows up in what you walked away with.
+    expect(g.cash).toBeLessThan(cash);
+    const over = ev.find((e) => e.t === "over") as { score: number };
+    expect(over.score).toBe(g.cash + g.fireSale);
+    expect(project(g).score).toBe(over.score);
+  });
+
+  it("offers nothing for a company that never earned anything", () => {
+    const g = badFirst(game(3));
+    g.users = 1;
+    g.earned = 0;
+    apply(g, { kind: "deploy" });
+    apply(g, { kind: "incident", choice: "wait" });
+    expect(g.fireSale).toBe(0);
   });
 
   it("no longer makes blue/green an unlosable run", () => {

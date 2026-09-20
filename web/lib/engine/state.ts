@@ -77,6 +77,7 @@ export type GameState = {
   clock: { day: number; hour: number; minute: number };   // in-game wall clock, day 0 = Mon
   sprintName: string;
   staged: number;
+  fireSale: number;              // what the wreckage sold for, 0 until the run ends badly
   toolsUsed: number;
   lastDoubled: boolean;         // was the most recent deploy Friday-armed
   offersDeclined: number;
@@ -119,6 +120,7 @@ export type GameEvent =
   | { t: "buy"; id: UpgradeId; ok: boolean; message: string }
   | { t: "draw"; items: ItemId[] }
   | { t: "offer"; amount: number; multiplier: number; declined: number }
+  | { t: "firesale"; amount: number; rate: number }
   | { t: "over"; outcome: Outcome; score: number };
 
 /** Thrown for an action the current phase does not allow. Routes turn this into a 400. */

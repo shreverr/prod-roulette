@@ -10,7 +10,7 @@ import { Dock } from "@/components/os/Dock";
 import { MenuBar } from "@/components/os/MenuBar";
 import { Window, type WinPos } from "@/components/os/Window";
 import { CANARY, CHART, COIN, FLAME, MAGNIFIER, ROCKET, SERVER, SKULL, WARNING, WRENCH } from "@/components/pixel/sprites";
-import { ABOUT_LINES, BOOT_LINES, BOOT_SHOWN, CONSOLE_REPLIES, inr } from "@/lib/engine/content";
+import { ABOUT_LINES, BOOT_LINES, BOOT_SHOWN, CONSOLE_REPLIES, MANUAL, inr } from "@/lib/engine/content";
 import { clockLabel, useGame } from "@/lib/useGame";
 import { sfx } from "@/lib/sfx";
 
@@ -28,6 +28,7 @@ type Id = (typeof WINDOWS)[number]["id"];
 export default function Page() {
   const { view, busy, stage, stageLabel, log, toasts, notifications, dialog, shake, start, send, dismiss, say } = useGame();
   const [about, setAbout] = useState(false);
+  const [help, setHelp] = useState(false);
   const [booting, setBooting] = useState<number | null>(null);
   const [notificationCenterOpen, setNotificationCenterOpen] = useState(false);
   const [lastReadNotification, setLastReadNotification] = useState(-1);
@@ -116,6 +117,15 @@ export default function Page() {
     try {
       await start();
       setBooting(null);
+      // First visit ever gets the manual unasked. After that it lives in the PRODOS menu.
+      try {
+        if (!localStorage.getItem("prodos:manual-seen")) {
+          localStorage.setItem("prodos:manual-seen", "1");
+          setHelp(true);
+        }
+      } catch {
+        // storage blocked (private window) — no manual, no crash
+      }
     } finally {
       loggingIn.current = false;
     }
@@ -165,6 +175,10 @@ export default function Page() {
         if (k === "enter" || k === " " || k === "escape") setAbout(false);
         return;
       }
+      if (help) {
+        if (k === "enter" || k === " " || k === "escape") setHelp(false);
+        return;
+      }
       if (dialog?.kind === "offer") return;   // signing ends the run — click it deliberately
       if (dialog) {
         if (k === "enter" || k === " ") dismiss();
@@ -182,7 +196,7 @@ export default function Page() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [about, bootDone, booting, canAct, dialog, dismiss, login, send, view]);
+  }, [about, bootDone, booting, canAct, dialog, dismiss, help, login, send, view]);
 
   /** K: the console prompt. Cosmetic, and it keeps the easter eggs out of the game hotkeys. */
   const runCommand = useCallback(
@@ -238,6 +252,7 @@ export default function Page() {
           void start();
         }}
         onAbout={() => setAbout(true)}
+        onHelp={() => setHelp(true)}
         onNotifications={() => setNotificationCenterOpen((open) => !open)}
         notificationsOpen={notificationCenterOpen}
         unreadNotifications={notifications.filter((notification) => notification.id > lastReadNotification).length}
@@ -357,6 +372,26 @@ export default function Page() {
         </AlertDialog>
       ) : null}
 
+      {help ? (
+        <AlertDialog
+          title="How to play"
+          icon={MAGNIFIER}
+          actions={[{ label: "GOT IT", primary: true, hint: "RET", onClick: () => setHelp(false) }]}
+        >
+          <h2>PROD ROULETTE</h2>
+          <p className="muted">Six deployments in the queue. Some are safe. Some take production down.</p>
+          <dl className="manual">
+            {MANUAL.map(([heading, lines]) => (
+              <div key={heading}>
+                <dt>{heading}</dt>
+                <dd>{lines.join(" ")}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="muted small">keys: D deploy · S staging · 1-6 tools · R/H/W during an incident</p>
+        </AlertDialog>
+      ) : null}
+
       {!view && booting === null ? (
         <AlertDialog
           title="PRODOS 1.0"
@@ -458,6 +493,13 @@ export default function Page() {
                 ? "Payroll came due and the account was empty."
                 : "Uptime hit zero. Nobody can reach the site."}
           </p>
+          {dialog.outcome !== "acquired" ? (
+            <p className="warn">
+              {view.fireSale > 0
+                ? `An acqui-hire offer came in for ${inr(view.fireSale)}. You took it. There was nothing else on the table.`
+                : "No offer came in. Not even for the domain."}
+            </p>
+          ) : null}
           <GameOverPanel view={view} />
         </AlertDialog>
       ) : null}
