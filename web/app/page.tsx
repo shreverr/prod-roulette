@@ -166,9 +166,9 @@ export default function Page() {
     (input: string) => {
       const cmd = input.toLowerCase().trim();
       sfx.keyed();
-      say(`> ${input}`);
+      say(`> ${input}`, "info", "terminal");
       const reply = CONSOLE_REPLIES[cmd];
-      say(reply ?? `command not found: ${cmd.split(" ")[0]}`, reply ? "info" : "bad");
+      say(reply ?? `command not found: ${cmd.split(" ")[0]}`, reply ? "info" : "bad", "shell");
     },
     [say],
   );

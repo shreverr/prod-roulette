@@ -504,6 +504,7 @@ p { margin: 0 0 4px; }
 
 .consolewrap { display: flex; flex-direction: column; height: 100%; }
 .console .stamp { color: #5f7a66; }
+.console .logsource { color: #78b7ff; }
 .consoleform {
   flex: none;
   display: flex;

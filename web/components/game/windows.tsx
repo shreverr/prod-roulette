@@ -5,12 +5,12 @@ import { useEffect, useRef, useState } from "react";
 import { inr, shareText } from "@/lib/engine/content";
 import type { Resolution } from "@/lib/engine/state";
 import type { View } from "@/lib/engine/view";
-import { useAnimatedNumber } from "@/lib/useGame";
+import { useAnimatedNumber, type LogEntry } from "@/lib/useGame";
 import { PixelChart } from "../pixel/PixelChart";
 import { Sprite } from "../pixel/Sprite";
 import { CHECK, MAGNIFIER, WARNING } from "../pixel/sprites";
 
-export type Log = { id: number; at: string; text: string; tone: "info" | "good" | "bad" }[];
+export type Log = LogEntry[];
 
 /** Hover copy for the tags that carry a lean, so a new player learns what they mean. */
 const TAG_HINTS: [RegExp, string][] = [
@@ -312,10 +312,11 @@ export function ConsolePanel({
       <ol className="console" ref={feed}>
         {log.map((l) => (
           <li key={l.id} className={l.tone}>
-            <span className="stamp">{l.at}</span> <span className="prompt">$</span> {l.text}
+            <span className="stamp">{l.at}</span> <span className="prompt">$</span>{" "}
+            <span className="logsource">[{l.source}]:</span> {l.text}
           </li>
         ))}
-        {log.length === 0 ? <li className="muted">$ waiting for a deployment…</li> : null}
+        {log.length === 0 ? <li className="muted">$ [system]: waiting for a deployment…</li> : null}
       </ol>
       <form
         className="consoleform"

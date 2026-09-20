@@ -24,6 +24,13 @@ export const DEPLOY_STAGES = [
 const CI_QUEUE_STAGE = "waiting for a free CI runner…";
 
 export type Toast = { id: number; channel: string; text: string };
+export type LogEntry = {
+  id: number;
+  at: string;
+  source: string;
+  text: string;
+  tone: "info" | "good" | "bad";
+};
 
 export const clockLabel = (c: { day: number; hour: number; minute: number }) =>
   `${WEEK[c.day]} ${String(c.hour).padStart(2, "0")}:${String(c.minute).padStart(2, "0")}`;
@@ -34,7 +41,7 @@ export function useGame() {
   const [view, setView] = useState<View | null>(null);
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState<number | null>(null);
-  const [log, setLog] = useState<{ id: number; at: string; text: string; tone: "info" | "good" | "bad" }[]>([]);
+  const [log, setLog] = useState<LogEntry[]>([]);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [stageLabel, setStageLabel] = useState<string | null>(null);
   const [queue, setQueue] = useState<Dialog[]>([]);
@@ -47,9 +54,9 @@ export function useGame() {
   const clock = useRef("Mon 09:12");
   const lastAction = useRef(Date.now());
 
-  const say = useCallback((text: string, tone: "info" | "good" | "bad" = "info") => {
+  const say = useCallback((text: string, tone: "info" | "good" | "bad" = "info", source = "system") => {
     // Oldest first: the console has a prompt at the bottom, so output must flow downward.
-    setLog((prev) => [...prev, { id: logId.current++, at: clock.current, text, tone }].slice(-60));
+    setLog((prev) => [...prev, { id: logId.current++, at: clock.current, source, text, tone }].slice(-60));
   }, []);
 
   const toast = useCallback((channel: string, text: string) => {
@@ -65,8 +72,8 @@ export function useGame() {
       for (const e of events) {
         switch (e.t) {
           case "company":
-            say(`you are running ${e.name}.`, "info");
-            say(e.blurb);
+            say(`you are running ${e.name}.`, "info", "system");
+            say(e.blurb, "info", "system");
             break;
 
           case "round:start": {
@@ -75,15 +82,15 @@ export function useGame() {
             const brief = QUEUE_BRIEFINGS[Math.floor(Math.random() * QUEUE_BRIEFINGS.length)]
               .replace(/\{size\}/g, String(e.size))
               .replace(/\{bad\}/g, String(e.bad));
-            say(`sprint ${e.round} — ${e.bad} of ${e.size} will take prod down`);
-            say(brief);
+            say(`sprint ${e.round} — ${e.bad} of ${e.size} will take prod down`, "info", "scheduler");
+            say(brief, "info", "scheduler");
             break;
           }
 
           case "deploy:ok": {
             const tags = [e.doubled && "friday x2", e.reckless && "reckless x1.5"].filter(Boolean);
             sfx.shipped();
-            say(`${e.version} shipped. +${inr(e.revenue)}${tags.length ? ` (${tags.join(", ")})` : ""}`, "good");
+            say(`${e.version} shipped. +${inr(e.revenue)}${tags.length ? ` (${tags.join(", ")})` : ""}`, "good", "deploy");
             await wait(220);
             break;
           }
@@ -97,7 +104,7 @@ export function useGame() {
 
           case "incident:open":
             lastIncident.current = e.title;
-            say(`INCIDENT: ${e.title} — ${e.usersHit.toLocaleString("en-IN")} users affected`, "bad");
+            say(`INCIDENT: ${e.title} — ${e.usersHit.toLocaleString("en-IN")} users affected`, "bad", "monitor");
             if (!e.absorbed) sfx.alarm();
             await wait(260);
             break;
@@ -121,6 +128,7 @@ export function useGame() {
                 ? `canary contained it. ${inr(e.loss)} written off.`
                 : `${e.choice} ${e.ok ? "held" : "failed"}${e.reason ? ` — ${e.reason}` : ""}. -${inr(e.loss)}`,
               e.ok ? "good" : "bad",
+              "incident",
             );
             await wait(180);
             break;
@@ -128,7 +136,7 @@ export function useGame() {
 
           case "tool":
             sfx.flip();
-            say(e.message, e.ok ? "info" : "bad");
+            say(e.message, e.ok ? "info" : "bad", `tool:${e.item}`);
             await wait(160);
             break;
 
@@ -138,29 +146,30 @@ export function useGame() {
                 ? "dodged a disaster in staging. velocity token spent."
                 : `staging was fine — you shelved ${inr(e.missed)} of revenue.`,
               e.wasBad ? "good" : "info",
+              "staging",
             );
             await wait(160);
             break;
 
           case "flag":
-            say(e.message, e.ok ? "good" : "bad");
+            say(e.message, e.ok ? "good" : "bad", "feature-flags");
             break;
 
           case "draw":
-            if (e.items.length) say(`drew ${e.items.length} tool(s)`);
+            if (e.items.length) say(`drew ${e.items.length} tool(s)`, "info", "inventory");
             break;
 
           case "buy":
             if (e.ok) sfx.coin();
             else sfx.deny();
-            say(e.message, e.ok ? "good" : "bad");
+            say(e.message, e.ok ? "good" : "bad", "upgrades");
             break;
 
           case "round:clear":
             sfx.coin();
             dialogs.push({ kind: "rewards", bonus: e.bonus, heal: e.heal, got: e.got, investor: e.investor });
-            say(`sprint cleared. +${inr(e.bonus)}`, "good");
-            say(`investor update sent: ${e.investor}`);
+            say(`sprint cleared. +${inr(e.bonus)}`, "good", "scheduler");
+            say(`investor update sent: ${e.investor}`, "info", "investor");
             await wait(200);
             break;
 
@@ -174,6 +183,7 @@ export function useGame() {
             say(
               `acquisition offer on the table: ${inr(e.amount)} (${e.multiplier}x revenue)`,
               "good",
+              "investor",
             );
             break;
 
@@ -188,6 +198,7 @@ export function useGame() {
                   ? "out of runway. run over."
                   : "production is down. run over.",
               e.outcome === "acquired" ? "good" : "bad",
+              "system",
             );
             break;
 
@@ -249,7 +260,7 @@ export function useGame() {
       const res = await request;
       if (res?.error) {
         sfx.deny();
-        say(`rejected: ${res.error}`, "bad");
+        say(`rejected: ${res.error}`, "bad", "api");
       } else {
         token.current = res.token;
         clock.current = clockLabel(res.view.clock);
@@ -268,7 +279,7 @@ export function useGame() {
     const id = setInterval(() => {
       if (busyRef.current || Date.now() - lastAction.current < 40_000) return;
       lastAction.current = Date.now();
-      say(IDLE_NUDGES[Math.floor(Math.random() * IDLE_NUDGES.length)]);
+      say(IDLE_NUDGES[Math.floor(Math.random() * IDLE_NUDGES.length)], "info", "scheduler");
     }, 5_000);
     return () => clearInterval(id);
   }, [view, say]);
