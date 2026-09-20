@@ -348,6 +348,12 @@ export default function Page() {
               </div>
             ))}
           </dl>
+          <p className="credit">
+            made by{" "}
+            <a href="https://x.com/Shreverrr" target="_blank" rel="noreferrer">shreshth verma</a>
+            {" & "}
+            <a href="https://x.com/ShivamBajpai04" target="_blank" rel="noreferrer">shivam bajpai</a>
+          </p>
         </AlertDialog>
       ) : null}
 

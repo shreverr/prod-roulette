@@ -2,7 +2,11 @@
 
 import { useEffect, useRef } from "react";
 
-/** A 1px-per-sample bar chart, scaled up. Pixel art, not a smooth SVG line. */
+const BAR = 2;   // bar width in canvas pixels
+const GAP = 1;
+const SLOT = BAR + GAP;
+
+/** A fixed-slot bar chart, scaled up. Pixel art, not a smooth SVG line. */
 export function PixelChart({
   data, max, color = "#3ac06a", height = 18, scale = 2, label,
 }: {
@@ -14,7 +18,8 @@ export function PixelChart({
   label?: string;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const width = 36;
+  const slots = 12;
+  const width = slots * SLOT;
 
   useEffect(() => {
     const canvas = ref.current;
@@ -25,19 +30,21 @@ export function PixelChart({
     if (!ctx) return;
     ctx.clearRect(0, 0, width, height);
 
-    // baseline
+    // empty slot tracks, so a short series still reads as a chart
+    ctx.fillStyle = "#c8c8c0";
+    for (let i = 0; i < slots; i++) ctx.fillRect(i * SLOT, 0, BAR, height - 1);
+
+    const series = data.slice(-slots);
+    const ceiling = Math.max(max, ...series, 1);
+    ctx.fillStyle = color;
+    series.forEach((v, i) => {
+      const h = Math.max(1, Math.round((v / ceiling) * (height - 1)));
+      ctx.fillRect(i * SLOT, height - 1 - h, BAR, h);
+    });
+
     ctx.fillStyle = "#4a4a52";
     ctx.fillRect(0, height - 1, width, 1);
-
-    const series = data.slice(-width);
-    const ceiling = Math.max(max, ...series, 1);
-    series.forEach((v, i) => {
-      const x = width - series.length + i;
-      const h = Math.max(1, Math.round((v / ceiling) * (height - 1)));
-      ctx.fillStyle = color;
-      ctx.fillRect(x, height - h, 1, h);
-    });
-  }, [data, max, color, height]);
+  }, [data, max, color, height, width]);
 
   return (
     <div className="chart">
