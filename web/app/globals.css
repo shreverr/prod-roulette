@@ -57,7 +57,7 @@ p { margin: 0 0 4px; }
   border-bottom: 2px solid var(--ink);
   z-index: 1000;
 }
-.menubar .logo { font-size: 12px; padding-right: 4px; }
+.menubar .logo { width: 14px; height: 14px; margin-right: 4px; flex: none; color: var(--ink); }
 .menubar .menuspace { flex: 1; }
 .menubar .clock { font-family: var(--font-stack-mono); font-size: 14px; letter-spacing: 1px; }
 .notificationbutton {
