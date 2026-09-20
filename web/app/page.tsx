@@ -83,6 +83,7 @@ export default function Page() {
   /** A: the boot sequence. Plays on every load, so the skip has to actually cut it short —
    *  a ref, not state, because the loop below reads it between awaits. */
   const skipBoot = useRef(false);
+  const loggingIn = useRef(false);
   const [bootLines, setBootLines] = useState<[string, string][]>([]);
 
   const boot = useCallback(async () => {
@@ -109,9 +110,15 @@ export default function Page() {
 
   const bootDone = booting !== null && booting >= BOOT_SHOWN;
 
-  const login = useCallback(() => {
-    setBooting(null);
-    void start();
+  const login = useCallback(async () => {
+    if (loggingIn.current) return;
+    loggingIn.current = true;
+    try {
+      await start();
+      setBooting(null);
+    } finally {
+      loggingIn.current = false;
+    }
   }, [start]);
 
   const focus = useCallback((id: Id) => {
@@ -144,7 +151,7 @@ export default function Page() {
       const k = e.key.toLowerCase();
 
       if (booting !== null) {
-        if (bootDone) { if (k === "enter") login(); }
+        if (bootDone) { if (k === "enter") void login(); }
         else if (k === "enter" || k === " ") skipBoot.current = true;
         return;
       }
@@ -309,7 +316,7 @@ export default function Page() {
       <Dock items={dockItems} onToggle={toggle} />
 
       {booting !== null ? (
-        <div className="bootscreen" onClick={() => { if (bootDone) login(); else skipBoot.current = true; }}>
+        <div className="bootscreen" onClick={() => { if (bootDone) void login(); else skipBoot.current = true; }}>
           <p className="bootheader">PRODOS 1.0</p>
           {bootLines.slice(0, booting).map(([label, result]) => (
             <p key={label}>
