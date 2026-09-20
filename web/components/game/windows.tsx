@@ -299,6 +299,9 @@ export function ConsolePanel({
   onCommand: (input: string) => void;
 }) {
   const [input, setInput] = useState("");
+  const [history, setHistory] = useState<string[]>([]);
+  const [historyIndex, setHistoryIndex] = useState<number | null>(null);
+  const draft = useRef("");
   const feed = useRef<HTMLOListElement>(null);
 
   // Keep the newest line in view, the way a terminal does.
@@ -324,13 +327,38 @@ export function ConsolePanel({
           e.preventDefault();
           const value = input.trim();
           setInput("");
-          if (value) onCommand(value);
+          setHistoryIndex(null);
+          draft.current = "";
+          if (value) {
+            setHistory((previous) => [...previous, value].slice(-50));
+            onCommand(value);
+          }
         }}
       >
         <span className="prompt">$</span>
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowUp") {
+              e.preventDefault();
+              if (history.length === 0) return;
+              const nextIndex = historyIndex === null ? history.length - 1 : Math.max(0, historyIndex - 1);
+              if (historyIndex === null) draft.current = input;
+              setHistoryIndex(nextIndex);
+              setInput(history[nextIndex]);
+            } else if (e.key === "ArrowDown" && historyIndex !== null) {
+              e.preventDefault();
+              const nextIndex = historyIndex + 1;
+              if (nextIndex < history.length) {
+                setHistoryIndex(nextIndex);
+                setInput(history[nextIndex]);
+              } else {
+                setHistoryIndex(null);
+                setInput(draft.current);
+              }
+            }
+          }}
           spellCheck={false}
           autoComplete="off"
           aria-label="console"
