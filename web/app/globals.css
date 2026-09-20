@@ -424,6 +424,7 @@ p { margin: 0 0 4px; }
   html, body { overflow: auto; }
   .desktop { display: flex; flex-direction: column; gap: 10px; padding: 30px 8px 96px; }
   .win { position: static !important; width: auto !important; height: auto !important; }
+  .consolewrap { height: min(220px, 45vh); }
   .growbox { display: none; }
   .dock { overflow-x: auto; max-width: 96vw; }
 }

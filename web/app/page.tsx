@@ -15,12 +15,12 @@ import { clockLabel, useGame } from "@/lib/useGame";
 import { sfx } from "@/lib/sfx";
 
 const WINDOWS = [
-  { id: "deploy", title: "deploy.app", icon: ROCKET, width: 400, x: 32, y: 56, open: true },
-  { id: "queue", title: "queue.mon", icon: SERVER, width: 240, x: 456, y: 56, open: true },
-  { id: "metrics", title: "metrics.mon", icon: CHART, width: 330, x: 456, y: 268, open: true },
-  { id: "tools", title: "tools.kit", icon: WRENCH, width: 360, x: 810, y: 56, open: true },
-  { id: "console", title: "console.log", icon: MAGNIFIER, width: 420, x: 32, y: 452, open: true },
-  { id: "upgrades", title: "upgrades.store", icon: COIN, width: 620, x: 300, y: 150, open: false },
+  { id: "deploy", title: "deploy.app", icon: ROCKET, width: 400, height: null, x: 32, y: 56, open: true },
+  { id: "queue", title: "queue.mon", icon: SERVER, width: 240, height: null, x: 456, y: 56, open: true },
+  { id: "metrics", title: "metrics.mon", icon: CHART, width: 330, height: null, x: 456, y: 268, open: true },
+  { id: "tools", title: "tools.kit", icon: WRENCH, width: 360, height: null, x: 810, y: 56, open: true },
+  { id: "console", title: "console.log", icon: MAGNIFIER, width: 420, height: 240, x: 32, y: 452, open: true },
+  { id: "upgrades", title: "upgrades.store", icon: COIN, width: 620, height: null, x: 300, y: 150, open: false },
 ] as const;
 
 type Id = (typeof WINDOWS)[number]["id"];
@@ -32,7 +32,7 @@ export default function Page() {
 
   const [pos, setPos] = useState<Record<Id, WinPos>>(() =>
     Object.fromEntries(
-      WINDOWS.map((w, i) => [w.id, { x: w.x, y: w.y, z: i + 1, open: w.open, w: w.width, h: null }]),
+      WINDOWS.map((w, i) => [w.id, { x: w.x, y: w.y, z: i + 1, open: w.open, w: w.width, h: w.height }]),
     ) as Record<Id, WinPos>,
   );
   const zTop = useRef(WINDOWS.length);
@@ -193,6 +193,7 @@ export default function Page() {
         title={meta.title}
         pos={pos[id]}
         defaultW={meta.width}
+        defaultH={meta.height}
         shake={id === "deploy" && shake}
         focused={pos[id].z === Math.max(...Object.values(pos).map((w) => w.z))}
         onFocus={() => focus(id)}

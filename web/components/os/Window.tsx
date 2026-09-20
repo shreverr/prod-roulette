@@ -8,7 +8,7 @@ import type { PixelMap } from "../pixel/sprites";
 export type WinPos = { x: number; y: number; z: number; open: boolean; w: number; h: number | null };
 
 export function Window({
-  title, icon, pos, defaultW, minW = 210, minH = 110, shake, focused, closable = true,
+  title, icon, pos, defaultW, defaultH = null, minW = 210, minH = 110, shake, focused, closable = true,
   children, footer, onFocus, onMove, onResize, onClose,
 }: {
   title: string;
@@ -16,6 +16,7 @@ export function Window({
   pos: WinPos;
   /** Size the grow box resets to on a double-click. */
   defaultW: number;
+  defaultH?: number | null;
   minW?: number;
   minH?: number;
   shake?: boolean;
@@ -34,8 +35,7 @@ export function Window({
 
   if (!pos.open) return null;
 
-  // Anything other than "configured width, content height" counts as zoomed, so one box toggles.
-  const zoomed = pos.h !== null || pos.w !== defaultW;
+  const zoomed = pos.h !== defaultH || pos.w !== defaultW;
 
   return (
     <section
@@ -84,7 +84,7 @@ export function Window({
           onPointerDown={(e) => e.stopPropagation()}
           onClick={() =>
             zoomed
-              ? onResize(defaultW, null)
+              ? onResize(defaultW, defaultH)
               : onResize(
                   Math.max(minW, window.innerWidth - pos.x - 16),
                   Math.max(minH, window.innerHeight - pos.y - 16),
@@ -122,7 +122,7 @@ export function Window({
         onPointerUp={() => {
           grow.current = null;
         }}
-        onDoubleClick={() => onResize(defaultW, null)}
+        onDoubleClick={() => onResize(defaultW, defaultH)}
       />
     </section>
   );
