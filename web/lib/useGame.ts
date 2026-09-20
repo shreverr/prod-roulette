@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import posthog from "posthog-js";
 import { IDLE_NUDGES, inr, QUEUE_BRIEFINGS, WEEK, type ItemId } from "./engine/content";
 import type { Action, GameEvent, Outcome } from "./engine/state";
 import type { View } from "./engine/view";
@@ -36,6 +37,9 @@ export const clockLabel = (c: { day: number; hour: number; minute: number }) =>
   `${WEEK[c.day]} ${String(c.hour).padStart(2, "0")}:${String(c.minute).padStart(2, "0")}`;
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const posthogConfigured = Boolean(
+  process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN && process.env.NEXT_PUBLIC_POSTHOG_HOST,
+);
 
 export function useGame() {
   const [view, setView] = useState<View | null>(null);
@@ -205,6 +209,12 @@ export function useGame() {
           case "over":
             if (e.outcome === "acquired") sfx.acquired();
             else sfx.over();
+            if (posthogConfigured) {
+              posthog.capture("game_run_completed", {
+                outcome: e.outcome,
+                final_score: e.score,
+              });
+            }
             dialogs.push({ kind: "over", outcome: e.outcome, score: e.score });
             say(
               e.outcome === "acquired"
@@ -238,6 +248,11 @@ export function useGame() {
     token.current = res.token;
     clock.current = clockLabel(res.view.clock);
     setView(res.view);
+    if (posthogConfigured) {
+      posthog.capture("game_run_started", {
+        starting_sprint: res.view.round,
+      });
+    }
     await playEvents(res.events as GameEvent[]);   // carries the sprint announcement
   }, [playEvents]);
 
@@ -282,6 +297,11 @@ export function useGame() {
         token.current = res.token;
         clock.current = clockLabel(res.view.clock);
         setView(res.view);
+        if (action.kind !== "continue" && posthogConfigured) {
+          posthog.capture("game_action_completed", {
+            action_kind: action.kind,
+          });
+        }
         await playEvents(res.events as GameEvent[]);
       }
       setBusy(false);

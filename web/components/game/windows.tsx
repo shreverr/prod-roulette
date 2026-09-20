@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import posthog from "posthog-js";
 
 import { inr, shareText } from "@/lib/engine/content";
 import type { Resolution } from "@/lib/engine/state";
@@ -22,6 +23,9 @@ const TAG_HINTS: [RegExp, string][] = [
 
 const versionHint = (version: string) =>
   TAG_HINTS.find(([re]) => re.test(version))?.[1] ?? "version this deploy will publish";
+const posthogConfigured = Boolean(
+  process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN && process.env.NEXT_PUBLIC_POSTHOG_HOST,
+);
 
 export function DeployPanel({
   view, busy, stage, stageLabel, onDeploy, onSkip, onFlag,
@@ -402,6 +406,7 @@ export function GameOverPanel({ view }: { view: View }) {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
+      if (posthogConfigured) posthog.capture("game_result_copied");
     } catch {
       // clipboard blocked (insecure origin, denied permission) — fall back to a selectable box
       setCopied(false);
@@ -456,6 +461,7 @@ export function GameOverPanel({ view }: { view: View }) {
     a.href = url;
     a.download = `prod-roulette-${view.company.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.png`;
     a.click();
+    if (posthogConfigured) posthog.capture("game_result_image_saved");
     URL.revokeObjectURL(url);
   };
 
