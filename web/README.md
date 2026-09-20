@@ -55,6 +55,7 @@ set it in production or old tokens survive a redeploy for anyone who has the dev
 
 ## Not built yet
 
-No login, leaderboard, save/resume, or daily seeded run. The engine is already
+No login, leaderboard, save/resume, or daily seeded run. A finished run copies a shareable
+result block to the clipboard, but nothing is recorded server-side. The engine is already
 server-authoritative and the token is a clean seam: swap `seal`/`unseal` for a Durable Object
 and the leaderboard becomes trustworthy without touching game code.

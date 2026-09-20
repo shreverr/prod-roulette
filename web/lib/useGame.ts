@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { IDLE_NUDGES, inr, WEEK, type ItemId } from "./engine/content";
+import { IDLE_NUDGES, inr, QUEUE_BRIEFINGS, WEEK, type ItemId } from "./engine/content";
 import type { Action, GameEvent, Outcome } from "./engine/state";
 import type { View } from "./engine/view";
 import { initAudio, sfx } from "./sfx";
@@ -64,9 +64,21 @@ export function useGame() {
 
       for (const e of events) {
         switch (e.t) {
-          case "round:start":
-            say(`sprint ${e.round} queued — ${e.bad} of ${e.size} will take prod down`);
+          case "company":
+            say(`you are running ${e.name}.`, "info");
+            say(e.blurb);
             break;
+
+          case "round:start": {
+            // The briefing is picked here, on the client: it is pure flavor wrapped around the
+            // two numbers the server already sent, so it can never correlate with the queue.
+            const brief = QUEUE_BRIEFINGS[Math.floor(Math.random() * QUEUE_BRIEFINGS.length)]
+              .replace(/\{size\}/g, String(e.size))
+              .replace(/\{bad\}/g, String(e.bad));
+            say(`sprint ${e.round} — ${e.bad} of ${e.size} will take prod down`);
+            say(brief);
+            break;
+          }
 
           case "deploy:ok": {
             const tags = [e.doubled && "friday x2", e.reckless && "reckless x1.5"].filter(Boolean);

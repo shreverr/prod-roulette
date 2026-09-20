@@ -1,10 +1,10 @@
 /** Ported 1:1 from prod_roulette/engine.py. Pure: no I/O, no globals, RNG cursor lives in state.
  *  Every mutating helper also appends to an event list the client replays as animation. */
 import {
-  AUTHORS, CHANGES, COMMIT_TYPES, DAYS, HOTFIX_FAILS, HOUR_BUCKETS, INCIDENTS, ITEMS, ITEM_POOL,
-  INVESTOR_UPDATES, NEUTRAL_COMMITS, PANIC_COMMITS, ROLLBACK_FAILS, SLACK_TOASTS, SPRINT_NAMES,
-  UPGRADES, WAIT_FAILS,
-  type Bump, type CommitTier, type ItemId, type UpgradeId, type VersionTag,
+  AUTHORS, CHANGES, COMMIT_TYPES, COMPANIES, COMPANY_IDS, DAYS, HOTFIX_FAILS, HOUR_BUCKETS,
+  INCIDENTS, ITEMS, ITEM_POOL, INVESTOR_UPDATES, NEUTRAL_COMMITS, PANIC_COMMITS, ROLLBACK_FAILS,
+  SLACK_TOASTS, SPRINT_NAMES, UPGRADES, WAIT_FAILS,
+  type Bump, type CommitTier, type CompanyId, type ItemId, type UpgradeId, type VersionTag,
 } from "./content";
 import { Rng } from "./rng";
 import {
@@ -54,7 +54,9 @@ export const multiplierFor = (declined: number) =>
 export const FIRST_OFFER = 2_000_000;
 export const OFFER_STEP = 1.35;
 export const handCap = (g: GameState) => (g.upgrades.includes("observability") ? 6 : 4);
-export const maxVelocity = (g: GameState) => (g.upgrades.includes("staging_env") ? 3 : 2);
+export const co = (g: GameState) => COMPANIES[g.company];
+export const maxVelocity = (g: GameState) =>
+  co(g).velocity + (g.upgrades.includes("staging_env") ? 1 : 0);
 export const has = (g: GameState, u: UpgradeId) => g.upgrades.includes(u);
 export const currentSlot = (g: GameState): Slot | null =>
   g.queue.i < g.queue.slots.length ? g.queue.slots[g.queue.i] : null;
@@ -254,6 +256,7 @@ export function buildQueue(g: GameState, rng: Rng, ev: GameEvent[]): [number, nu
       known: false,
       ciSeen: false,
       diffSeen: false,
+      resolution: null,
     });
   }
   g.queue = { slots, i: 0 };
@@ -285,7 +288,7 @@ function deploy(g: GameState, rng: Rng, ev: GameEvent[]): void {
   ev.push({ t: "deploy:start", version: s.version });
 
   if (!s.bad) {
-    let rev = Math.trunc(baseRevenue(g.round) * userFactor(g));
+    let rev = Math.trunc(baseRevenue(g.round) * userFactor(g) * co(g).revenue);
     if (doubled) rev *= 2;
     if (reckless) {
       rev = Math.trunc(rev * 1.5);
@@ -295,6 +298,7 @@ function deploy(g: GameState, rng: Rng, ev: GameEvent[]): void {
     g.earned += rev;
     const growth = rng.randint(80, 400);
     g.users += growth;
+    s.resolution = "ok";
     ev.push({ t: "deploy:ok", version: s.version, revenue: rev, reckless, doubled });
     ev.push({ t: "cash", delta: rev });
     ev.push({ t: "users", delta: growth });
@@ -302,7 +306,7 @@ function deploy(g: GameState, rng: Rng, ev: GameEvent[]): void {
   }
 
   g.incidents += 1;
-  let damage = doubled ? 2 : 1;
+  let damage = Math.max(1, Math.round((doubled ? 2 : 1) * co(g).damage));
   let absorbed = false;
   if (has(g, "canary") && !g.canaryUsed) {
     g.canaryUsed = true;
@@ -310,7 +314,7 @@ function deploy(g: GameState, rng: Rng, ev: GameEvent[]): void {
     damage = 0;
   }
   const flavor = rng.choice(INCIDENTS);
-  const frac = Math.min(0.6, flavor.frac * (1 + 0.04 * g.round));
+  const frac = Math.min(0.6, flavor.frac * (1 + 0.04 * g.round) * co(g).userLoss);
   const usersHit = Math.max(1, Math.trunc(g.users * frac));
   const inc: Incident = {
     title: flavor.title,
@@ -321,6 +325,7 @@ function deploy(g: GameState, rng: Rng, ev: GameEvent[]): void {
     absorbed,
   };
 
+  s.resolution = "down";
   ev.push({ t: "deploy:bad", version: s.version, doubled });
   ev.push({
     t: "incident:open",
@@ -383,11 +388,12 @@ export function resolveIncident(
   g.users = Math.max(0, g.users - churn);
   g.pending = null;
 
+  ev.push({ t: "incident:result", choice, ok, damage, loss, reason });
+  // Toast lands after the result, never before it — flavor follows the outcome, always.
   if (rng.random() < 0.6) {
     const toast = rng.choice(SLACK_TOASTS);
     ev.push({ t: "slack", channel: toast.channel, text: toast.text });
   }
-  ev.push({ t: "incident:result", choice, ok, damage, loss, reason });
   if (damage) ev.push({ t: "uptime", delta: -damage });
   ev.push({ t: "cash", delta: -loss });
   ev.push({ t: "users", delta: -churn });
@@ -406,6 +412,7 @@ function skip(g: GameState, ev: GameEvent[]): void {
     missed = Math.trunc(baseRevenue(g.round) / 3);
     g.cash -= missed;
   }
+  s.resolution = s.bad ? "dodged" : "wasted";
   ev.push({ t: "skip", wasBad: s.bad, missed });
   if (missed) ev.push({ t: "cash", delta: -missed });
 }
@@ -474,6 +481,7 @@ const EFFECTS: Record<ItemId, Effect> = {
   revert: (g, _rng, ev) => {
     const s = g.queue.slots[g.queue.i];
     s.known = true;
+    s.resolution = "reverted";
     g.queue.i += 1;
     return [true, `reverted ${s.version} unshipped — it was ${s.bad ? "a DISASTER" : "fine, actually"}`];
   },
@@ -551,7 +559,7 @@ export function drawItems(g: GameState, n: number, rng: Rng, ev: GameEvent[]): I
 // ---------- between rounds ----------
 
 function endRound(g: GameState, rng: Rng, ev: GameEvent[]): void {
-  const bonus = Math.trunc(baseRevenue(g.round) * 2 * userFactor(g)) + g.users * 8;
+  const bonus = Math.trunc(baseRevenue(g.round) * 2 * userFactor(g) * co(g).revenue) + g.users * 8;
   g.cash += bonus;
   g.earned += bonus;
   // Overnight recovery dries up past sprint 8.
@@ -633,16 +641,20 @@ function afterSlot(g: GameState, rng: Rng, ev: GameEvent[]): void {
   g.phase = "deploying";
 }
 
-export function newGame(seed?: number): { state: GameState; events: GameEvent[] } {
+export function newGame(seed?: number, company?: CompanyId): { state: GameState; events: GameEvent[] } {
   const rng = new Rng(seed);
+  // Drawn from the seeded RNG, so "same seed replays identically" still holds.
+  const id = company ?? rng.choice(COMPANY_IDS);
+  const c = COMPANIES[id];
   const state: GameState = {
     seed: rng.seed,
+    company: id,
     round: 1,
-    uptime: 4,
-    maxUptime: 4,
-    cash: 800_000,
+    uptime: c.uptime,
+    maxUptime: c.uptime,
+    cash: c.cash,
     users: 12_482,
-    velocity: 2,
+    velocity: c.velocity,
     hand: [],
     upgrades: [],
     queue: { slots: [], i: 0 },
@@ -667,7 +679,7 @@ export function newGame(seed?: number): { state: GameState; events: GameEvent[] 
     declineHeat: 0,
     outcome: null,
   };
-  const events: GameEvent[] = [];
+  const events: GameEvent[] = [{ t: "company", name: c.name, blurb: c.blurb }];
   buildQueue(state, rng, events);
   state.seed = rng.seed;
   return { state, events };

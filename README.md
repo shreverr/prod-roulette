@@ -15,10 +15,11 @@ Each sprint loads N deployments. You are told **how many** will take prod down �
 ones, and the order is shuffled. For each one you either `DEPLOY` or spend a velocity token to
 shunt it to staging.
 
-**Nothing keeps count for you.** The queue window shows your position and nothing else: what has
-already shipped, and how many disasters are still in front of you, is yours to track. The running
-tally is not even sent to the browser — only the sprint-start announcement is, so there is no
-devtools tab to peek at. `console.log` is your notebook.
+**The past is on screen. The future is not.** `queue.mon` draws the slots you have already
+settled — `✓` shipped clean, `✗` took prod down, `⊘` caught in staging — and then a `?` for
+everything still ahead. Remembering what you already watched happen was never the game; working
+out what is left is. The count of disasters remaining is still not sent to the browser, so there
+is no devtools tab to peek at, and `console.log` is still the long-form record.
 
 A safe deploy pays revenue. A disaster opens an incident and one decision: `ROLLBACK`, `HOTFIX`,
 or `WAIT IT OUT`. Rollback fails often, sometimes because the rollback pipeline was in the deploy.
@@ -45,6 +46,23 @@ Reading well is worth roughly **70%** accuracy — clearly better than the coin 
 proof. That figure is calibrated by Monte Carlo and asserted in the test suite, so a flavor edit
 cannot quietly wreck the balance.
 
+## What you inherited
+
+A run opens by drawing one of five companies, from the seeded RNG — so a seed still replays, and
+no two runs start the same:
+
+| | uptime | velocity | and | blind play wins | reading wins |
+|---|---|---|---|---|---|
+| ENTERPRISE SAAS | 4 | 2 | the honest baseline | 87% | 99% |
+| SERIES A FINTECH | 3 | 3 | users legally cannot leave | 63% | 97% |
+| CRYPTO EXCHANGE | 3 | 2 | 2x revenue, 2x damage | 54% | 85% |
+| FORTY-YEAR-OLD BANK | 5 | 1 | revenue crawls, one token | 71% | 89% |
+| YC BATCH, WEEK 3 | 2 | 4 | nothing to break yet | 40% | 94% |
+
+Measured over 300 runs per cell. Every company except the baseline punishes blind play harder
+than it punishes a reader — the point of a starting condition is that it changes which
+strategy is correct, not just which numbers are bigger.
+
 ## Recklessness
 
 Deploying a slot you spent no tool on pays **1.5x**, stacking with `ship it friday` for 3x. The
@@ -67,6 +85,10 @@ cliff:
 
 Greed is priced, and skill buys the extra rungs.
 
+A finished run builds a copyable result block — company, sprint reached, earned title, the
+uptime bar, and the settled-slot strip as coloured squares. It says what happened to you without
+handing anyone the queue you had to read.
+
 Two ways to lose: `PRODUCTION IS DOWN` (uptime hits zero) and `OUT OF RUNWAY` (payroll comes due
 at sprint end and the account is empty). Incidents cost users on every outcome — even a clean
 rollback — and revenue scales with the user base, so bleeding users is its own death spiral. That
@@ -79,7 +101,7 @@ fill from the box at the right of the titlebar (click again to restore). Growing
 gives you more log lines, which matters now that the log is the only record of what already
 shipped.
 
-PRODOS boots once with a startup sequence, then gets out of the way. The menu bar clock is the
+PRODOS runs its startup sequence on every load; click the boot screen to cut it short. The menu bar clock is the
 **game's** clock, not yours — every deploy costs time, so Friday evening genuinely arrives, and
 the commit timestamps live in the same fiction. `console.log` takes typed input; try `help`.
 

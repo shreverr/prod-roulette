@@ -1,9 +1,12 @@
 /** Ported from test_engine.py, plus the three checks the web version added. */
 import { describe, expect, it } from "vitest";
-import { CONSOLE_REPLIES, runTitle, UPGRADES, UPGRADE_IDS, WEEK, type UpgradeId } from "./content";
+import {
+  COMPANIES, COMPANY_IDS, CONSOLE_REPLIES, QUEUE_BRIEFINGS, runTitle, shareText, UPGRADES,
+  UPGRADE_IDS, WEEK, type UpgradeId,
+} from "./content";
 import {
   apply, bake, baseRevenue, buildTuning, drawItems, FIRST_OFFER, handCap, MAX_DECLINE_HEAT,
-  multiplierFor, newGame, queueSpec, SIGNAL_STRENGTH,
+  maxVelocity, multiplierFor, newGame, queueSpec, SIGNAL_STRENGTH,
 } from "./engine";
 import { CHANNELS, measure, readDanger, type Free } from "./calibrate";
 import { Rng } from "./rng";
@@ -11,8 +14,10 @@ import { IllegalAction, type Action, type GameState } from "./state";
 import { project } from "./view";
 import { seal, unseal } from "./seal";
 
+/** Pinned to the baseline company so a seed's starting numbers are stated, not inherited.
+ *  Company variety has its own describe block below. */
 function game(seed = 7, patch: Partial<GameState> = {}): GameState {
-  const { state } = newGame(seed);
+  const { state } = newGame(seed, "saas");
   Object.assign(state, patch);
   return state;
 }
@@ -290,9 +295,11 @@ describe("the view", () => {
       const g = game(seed);
       while (g.phase !== "over") {
         const view = project(g);
-        // The queue is a position and a total. No layout, no running tally.
-        expect(Object.keys(view.queue).sort()).toEqual(["index", "total"]);
+        // Position, total, and the settled prefix. No layout, no tally of what is still ahead.
+        expect(Object.keys(view.queue).sort()).toEqual(["index", "resolved", "total"]);
         expect(view.queue.total).toBe(g.queue.slots.length);
+        // The strip may only ever describe slots the player has already acted on.
+        expect(view.queue.resolved.length).toBe(g.queue.i);
 
         const wire = JSON.stringify(view);
         expect(wire).not.toContain("remaining");
@@ -586,6 +593,49 @@ describe("the acquisition offer", () => {
 
 
 describe("flavor that must not become a tell", () => {
+  /** Every event that carries writer-authored prose. If one of these can reach the player
+   *  before the reveal, the joke has become free information about the hidden flag. */
+  const FLAVOR = new Set(["slack", "incident:open", "round:clear", "company"]);
+  const REVEAL = new Set(["deploy:ok", "deploy:bad", "skip", "incident:result", "round:clear"]);
+
+  it("never puts flavor text ahead of the reveal it belongs to", () => {
+    // This is the general form of the toast rule below: for any action on a hidden slot, the
+    // outcome must already be on screen before any prose lands. Widening the flavor pools is
+    // then free — a new joke cannot leak, whatever pool it goes in.
+    for (let seed = 0; seed < 40; seed++) {
+      const g = game(seed);
+      let guard = 0;
+      while (g.phase !== "over" && guard++ < 400) {
+        const ev =
+          g.phase === "deploying" ? apply(g, { kind: "deploy" })
+            : g.phase === "incident" ? apply(g, { kind: "incident", choice: "rollback" })
+              : g.phase === "rewards" ? apply(g, { kind: "continue" })
+                : g.phase === "offer" ? apply(g, { kind: "decline" })
+                  : apply(g, { kind: "nextRound" });
+
+        const firstFlavor = ev.findIndex((e) => FLAVOR.has(e.t));
+        if (firstFlavor < 0) continue;
+        const firstReveal = ev.findIndex((e) => REVEAL.has(e.t));
+        expect(
+          firstReveal >= 0 && firstReveal <= firstFlavor,
+          `flavor "${ev[firstFlavor].t}" landed before any reveal`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("keeps every sprint briefing outcome-independent", () => {
+    // A briefing is chosen at random on the client, so it must read correctly for ANY
+    // (size, bad) pair the engine can produce. Both counts must be placeholders, never baked in.
+    for (const b of QUEUE_BRIEFINGS) {
+      expect(b, `briefing missing {size}: ${b}`).toContain("{size}");
+      expect(b, `briefing missing {bad}: ${b}`).toContain("{bad}");
+      // no stray digits — a hardcoded number would contradict the announced count
+      expect(b.replace(/\{size\}|\{bad\}/g, ""), `briefing hardcodes a number: ${b}`)
+        .not.toMatch(/[0-9]/);
+    }
+  });
+
   it("never fires a slack toast before the player knows the outcome", () => {
     // A toast on an unresolved deploy would be free information about the hidden flag.
     for (let seed = 0; seed < 60; seed++) {
@@ -663,6 +713,87 @@ describe("the in-game clock", () => {
       apply(g, { kind: "nextRound" });
     }
     expect(names.size).toBeGreaterThan(1);
+  });
+});
+
+describe("the starting company", () => {
+  it("sets the knobs it advertises", () => {
+    for (const id of COMPANY_IDS) {
+      const { state } = newGame(11, id);
+      const c = COMPANIES[id];
+      expect(state.company, id).toBe(id);
+      expect(state.uptime, `${id} uptime`).toBe(c.uptime);
+      expect(state.maxUptime, `${id} max uptime`).toBe(c.uptime);
+      expect(state.cash, `${id} cash`).toBe(c.cash);
+      expect(maxVelocity(state), `${id} velocity`).toBe(c.velocity);
+    }
+  });
+
+  it("adds exactly one token for a staging environment, whatever the company", () => {
+    for (const id of COMPANY_IDS) {
+      const base = newGame(3, id).state;
+      const withEnv = newGame(3, id).state;
+      withEnv.upgrades.push("staging_env");
+      expect(maxVelocity(withEnv) - maxVelocity(base), id).toBe(1);
+    }
+  });
+
+  it("scales payouts by the company multiplier", () => {
+    // crypto pays 2x, bank pays 0.6x — same seed, same queue, different revenue.
+    const rev = (id: "crypto" | "bank" | "saas") => {
+      const g = newGame(5, id).state;
+      const i = g.queue.slots.findIndex((s) => !s.bad);
+      g.queue.i = i;
+      g.phase = "deploying";
+      const before = g.cash;
+      apply(g, { kind: "deploy" });
+      return g.cash - before;
+    };
+    expect(rev("crypto")).toBeGreaterThan(rev("saas"));
+    expect(rev("bank")).toBeLessThan(rev("saas"));
+  });
+
+  it("is drawn from the seed, so a run still replays", () => {
+    for (let seed = 0; seed < 20; seed++) {
+      expect(newGame(seed).state.company).toBe(newGame(seed).state.company);
+    }
+    // and the draw actually varies across seeds
+    const seen = new Set(Array.from({ length: 60 }, (_, s) => newGame(s).state.company));
+    expect(seen.size).toBeGreaterThan(1);
+  });
+
+  it("never hands out a company that cannot survive its own first sprint", () => {
+    // uptime must outlast the worst case: every disaster in sprint 1 deployed blind.
+    for (const id of COMPANY_IDS) {
+      const g = newGame(9, id).state;
+      const disasters = g.queue.slots.filter((s) => s.bad).length;
+      const worst = disasters * Math.max(1, Math.round(COMPANIES[id].damage));
+      expect(g.uptime, `${id} cannot absorb sprint 1`).toBeGreaterThanOrEqual(worst - g.velocity);
+    }
+  });
+});
+
+describe("the shareable result", () => {
+  it("names the company and the sprint, and never leaks an unresolved slot", () => {
+    const out = shareText({
+      company: "CRYPTO EXCHANGE", round: 7, outcome: "acquired", title: "RECKLESS AND RICH",
+      uptime: 2, maxUptime: 4, deploys: 34, incidents: 9, recklessDeploys: 21,
+      score: 42_000_000, resolved: ["ok", "down", "dodged"],
+    });
+    expect(out).toContain("CRYPTO EXCHANGE");
+    expect(out).toContain("sprint 7");
+    // one glyph per settled slot, and nothing for the slots still hidden
+    expect([...out].filter((ch) => "\u{1f7e9}\u{1f7e5}\u{1f7e7}".includes(ch)).length).toBe(3);
+  });
+
+  it("drops empty lines instead of printing null", () => {
+    const out = shareText({
+      company: "YC BATCH, WEEK 3", round: 1, outcome: "outage", title: null,
+      uptime: 0, maxUptime: 2, deploys: 2, incidents: 2, recklessDeploys: 0,
+      score: 0, resolved: [],
+    });
+    expect(out).not.toContain("null");
+    expect(out.split(String.fromCharCode(10))).toHaveLength(3);
   });
 });
 

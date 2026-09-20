@@ -10,7 +10,7 @@ import { Dock } from "@/components/os/Dock";
 import { MenuBar } from "@/components/os/MenuBar";
 import { Window, type WinPos } from "@/components/os/Window";
 import { CANARY, CHART, COIN, FLAME, MAGNIFIER, ROCKET, SERVER, SKULL, WARNING, WRENCH } from "@/components/pixel/sprites";
-import { ABOUT_LINES, BOOT_LINES, CONSOLE_REPLIES, inr } from "@/lib/engine/content";
+import { ABOUT_LINES, BOOT_LINES, BOOT_SHOWN, CONSOLE_REPLIES, inr } from "@/lib/engine/content";
 import { clockLabel, useGame } from "@/lib/useGame";
 import { sfx } from "@/lib/sfx";
 
@@ -64,28 +64,36 @@ export default function Page() {
     }));
   }, [view]);
 
-  /** A: the boot sequence. Shown once per browser, skippable, then it never nags again. */
+  /** A: the boot sequence. Plays on every load, so the skip has to actually cut it short —
+   *  a ref, not state, because the loop below reads it between awaits. */
+  const skipBoot = useRef(false);
+  const [bootLines, setBootLines] = useState<[string, string][]>([]);
+
   const boot = useCallback(async () => {
-    let seen = false;
-    try {
-      seen = localStorage.getItem("prodos:booted") === "1";
-    } catch {
-      // site data blocked — just skip the sequence
+    skipBoot.current = false;
+    // Fisher-Yates on a copy, then take the first few — boot plays every load, so the lines
+    // should differ. (sort(() => Math.random() - 0.5) is a biased shuffle; this one isn't.)
+    const pool = [...BOOT_LINES];
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
     }
-    if (seen) {
-      void start();
-      return;
-    }
+    const lines = pool.slice(0, BOOT_SHOWN);
+    setBootLines(lines);
+
     sfx.boot();
-    for (let i = 0; i <= BOOT_LINES.length; i++) {
+    for (let i = 1; i <= lines.length; i++) {
       setBooting(i);
+      if (skipBoot.current) break;
       await new Promise((r) => setTimeout(r, 420));
     }
-    try {
-      localStorage.setItem("prodos:booted", "1");
-    } catch {
-      // fine
-    }
+    // Land on the full list + "ready." and stay there. login() is what starts the run.
+    setBooting(lines.length);
+  }, []);
+
+  const bootDone = booting !== null && booting >= BOOT_SHOWN;
+
+  const login = useCallback(() => {
     setBooting(null);
     void start();
   }, [start]);
@@ -119,6 +127,11 @@ export default function Page() {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       const k = e.key.toLowerCase();
 
+      if (booting !== null) {
+        if (bootDone) { if (k === "enter") login(); }
+        else if (k === "enter" || k === " ") skipBoot.current = true;
+        return;
+      }
       if (dialog?.kind === "incident") {
         if (k === "r") void send({ kind: "incident", choice: "rollback" });
         if (k === "h") void send({ kind: "incident", choice: "hotfix" });
@@ -146,7 +159,7 @@ export default function Page() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [about, canAct, dialog, dismiss, send, view]);
+  }, [about, bootDone, booting, canAct, dialog, dismiss, login, send, view]);
 
   /** K: the console prompt. Cosmetic, and it keeps the easter eggs out of the game hotkeys. */
   const runCommand = useCallback(
@@ -249,15 +262,20 @@ export default function Page() {
       <Dock items={dockItems} onToggle={toggle} />
 
       {booting !== null ? (
-        <div className="bootscreen" onClick={() => setBooting(BOOT_LINES.length)}>
+        <div className="bootscreen" onClick={() => { if (bootDone) login(); else skipBoot.current = true; }}>
           <p className="bootheader">PRODOS 1.0</p>
-          {BOOT_LINES.slice(0, booting).map(([label, result]) => (
+          {bootLines.slice(0, booting).map(([label, result]) => (
             <p key={label}>
               {label}
               {".".repeat(Math.max(2, 36 - label.length))} {result}
             </p>
           ))}
-          {booting >= BOOT_LINES.length ? <p className="bootok">ready.</p> : null}
+          {bootDone ? (
+            <>
+              <p className="bootok">ready.</p>
+              <p className="bootprompt">press RETURN to log in</p>
+            </>
+          ) : null}
         </div>
       ) : null}
 

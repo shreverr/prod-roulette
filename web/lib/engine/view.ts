@@ -1,10 +1,15 @@
 /** The hidden-information gate. The ONLY thing that decides what the client is allowed to see.
  *  If a fact is not in here, it never reaches the browser. */
-import { ITEMS, runTitle, UPGRADES, UPGRADE_IDS, type ItemId, type UpgradeId } from "./content";
+import {
+  COMPANIES, ITEMS, runTitle, UPGRADES, UPGRADE_IDS,
+  type CompanyId, type ItemId, type UpgradeId,
+} from "./content";
 import { handCap, has, maxVelocity, multiplierFor } from "./engine";
-import type { Commit, GameState, Outcome, Phase, Pr, Risk } from "./state";
+import type { Commit, GameState, Outcome, Phase, Pr, Resolution, Risk } from "./state";
 
 export type View = {
+  /** What you inherited. Fixed for the run, and pure flavor plus the knobs it already set. */
+  company: { id: CompanyId; name: string; blurb: string };
   phase: Phase;
   round: number;
   uptime: number;
@@ -19,9 +24,9 @@ export type View = {
   hand: { id: ItemId; label: string; blurb: string }[];
   upgrades: UpgradeId[];
   shop: { id: UpgradeId; name: string; price: number; blurb: string; owned: boolean; affordable: boolean }[];
-  /** Position only. What has already happened, and how many disasters are left, is the
-   *  player's job to remember — so neither is sent. */
-  queue: { index: number; total: number };
+  /** Position, total, and how the slots behind you turned out. `resolved` is only ever the
+   *  settled prefix — what is still ahead stays hidden, which is where the deduction lives. */
+  queue: { index: number; total: number; resolved: Resolution[] };
   current: {
     version: string;
     changes: string[];
@@ -54,6 +59,7 @@ export function project(g: GameState): View {
   const cur = g.queue.i < g.queue.slots.length ? g.queue.slots[g.queue.i] : null;
 
   return {
+    company: { id: g.company, name: COMPANIES[g.company].name, blurb: COMPANIES[g.company].blurb },
     phase: g.phase,
     round: g.round,
     uptime: g.uptime,
@@ -73,7 +79,11 @@ export function project(g: GameState): View {
       owned: has(g, id),
       affordable: g.cash >= UPGRADES[id].price,
     })),
-    queue: { index: g.queue.i, total: g.queue.slots.length },
+    queue: {
+      index: g.queue.i,
+      total: g.queue.slots.length,
+      resolved: g.queue.slots.slice(0, g.queue.i).map((s) => s.resolution ?? "ok"),
+    },
     current: cur
       ? {
           version: cur.version,

@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { inr } from "@/lib/engine/content";
+import { inr, shareText } from "@/lib/engine/content";
+import type { Resolution } from "@/lib/engine/state";
 import type { View } from "@/lib/engine/view";
 import { useAnimatedNumber } from "@/lib/useGame";
 import { PixelChart } from "../pixel/PixelChart";
@@ -121,17 +122,44 @@ export function DeployPanel({
   );
 }
 
+/** Glyph + hover copy for a settled slot. Every one of these was announced when it happened. */
+const RESOLVED: Record<Resolution, { glyph: string; cls: string; title: string }> = {
+  ok: { glyph: "\u2713", cls: "ok", title: "shipped clean" },
+  down: { glyph: "\u2717", cls: "down", title: "took prod down" },
+  dodged: { glyph: "\u229d", cls: "dodged", title: "staged \u2014 it was a disaster" },
+  wasted: { glyph: "\u229d", cls: "wasted", title: "staged \u2014 it was fine, token burned" },
+  reverted: { glyph: "\u21a9", cls: "wasted", title: "reverted unshipped" },
+};
+
 export function QueuePanel({ view }: { view: View }) {
-  const drained = view.queue.index >= view.queue.total;
+  const { index, total, resolved } = view.queue;
+  const drained = index >= total;
+  const down = resolved.filter((r) => r === "down").length;
+  const caught = resolved.filter((r) => r === "dodged").length;
+
   return (
     <>
       <p className="sprintname">{view.sprintName}</p>
       <p className="position vt">
-        {drained ? "queue drained" : `position ${view.queue.index + 1} of ${view.queue.total}`}
+        {drained ? "queue drained" : `position ${index + 1} of ${total}`}
       </p>
+
+      {/* The settled prefix, then the cursor, then what is still hidden. */}
+      <p className="queuestrip vt">
+        {Array.from({ length: total }, (_, i) => {
+          if (i < resolved.length) {
+            const r = RESOLVED[resolved[i]];
+            return <b key={i} className={r.cls} title={r.title}>{r.glyph}</b>;
+          }
+          if (i === index) return <b key={i} className="here" title="up next">{"\u25b8"}</b>;
+          return <b key={i} className="unknown" title="not your problem yet">?</b>;
+        })}
+      </p>
+
       <p className="muted small">
-        order shuffled. what already shipped, and how many disasters are left, is yours to
-        remember.
+        {down || caught
+          ? `${down} took prod down${caught ? `, ${caught} caught in staging` : ""}. how many are left is still yours to work out.`
+          : "order shuffled. what is still ahead of you is yours to work out."}
       </p>
     </>
   );
@@ -333,6 +361,27 @@ export function OfferPanel({ view }: { view: View }) {
 }
 
 export function GameOverPanel({ view }: { view: View }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    const text = shareText({
+      company: view.company.name, round: view.round, outcome: view.outcome, title: view.title,
+      uptime: view.uptime, maxUptime: view.maxUptime, deploys: view.stats.deploys,
+      incidents: view.stats.incidents, recklessDeploys: view.stats.recklessDeploys,
+      score: view.score, resolved: view.queue.resolved,
+    });
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+    } catch {
+      // clipboard blocked (insecure origin, denied permission) — fall back to a selectable box
+      setCopied(false);
+      setFallback(text);
+    }
+  };
+
+  const [fallback, setFallback] = useState<string | null>(null);
+
   return (
     <>
       {view.title ? <p className="runtitle">“{view.title}”</p> : null}
@@ -352,6 +401,13 @@ export function GameOverPanel({ view }: { view: View }) {
         <dd className={view.outcome === "acquired" ? "good" : ""}>{inr(view.score)}</dd>
       </div>
       </dl>
+
+      <button className="btn" onClick={() => void copy()}>
+        {copied ? "COPIED" : "COPY RESULT"}
+      </button>
+      {fallback ? (
+        <textarea className="sharebox" readOnly rows={6} value={fallback} onFocus={(e) => e.currentTarget.select()} />
+      ) : null}
     </>
   );
 }

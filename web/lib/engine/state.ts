@@ -1,6 +1,10 @@
-import type { ItemId, UpgradeId } from "./content";
+import type { CompanyId, ItemId, UpgradeId } from "./content";
 
 export type Risk = "LOW" | "MEDIUM" | "HIGH";
+
+/** How a slot left the queue. Every one of these is already public the moment it happens —
+ *  the deploy/skip/revert events announce it — so replaying the strip leaks nothing new. */
+export type Resolution = "ok" | "down" | "dodged" | "wasted" | "reverted";
 
 /** Free, always-visible metadata. Every field leans toward the hidden outcome, none proves it. */
 export type Commit = {
@@ -32,6 +36,7 @@ export type Slot = {
   known: boolean;    // true nature uncovered
   ciSeen: boolean;
   diffSeen: boolean;
+  resolution: Resolution | null;   // null while the slot is still ahead of you
 };
 
 export type Incident = {
@@ -49,6 +54,7 @@ export type Outcome = "acquired" | "outage" | "insolvent";
 
 export type GameState = {
   seed: number;                 // Rng cursor, travels with the state
+  company: CompanyId;           // what you inherited — sets the starting knobs and the payout scale
   round: number;
   uptime: number;
   maxUptime: number;
@@ -95,6 +101,7 @@ export type Action =
   | { kind: "decline" };
 
 export type GameEvent =
+  | { t: "company"; name: string; blurb: string }
   | { t: "round:start"; round: number; size: number; bad: number }
   | { t: "deploy:start"; version: string }
   | { t: "deploy:ok"; version: string; revenue: number; reckless: boolean; doubled: boolean }

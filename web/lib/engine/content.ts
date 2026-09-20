@@ -1,6 +1,8 @@
 /** Transcribed from prod_roulette/content.py. Flavor and tuning only, no logic. */
 
 /** Indian-grouped rupees: 842000 -> ₹8,42,000 */
+const NEWLINE = String.fromCharCode(10);
+
 export function inr(n: number): string {
   const sign = n < 0 ? "-" : "";
   const s = String(Math.abs(Math.trunc(n)));
@@ -137,6 +139,15 @@ export const INCIDENTS: { title: string; lines: string[]; frac: number }[] = [
   { title: "INFINITE RETRY LOOP", lines: ["Outbound webhooks: 3.4M sent", "Vendor rate-limited us permanently"], frac: 0.09 },
   { title: "SILENT DATA CORRUPTION", lines: ["Rows with null tenant_id: 12,904", "Nobody noticed for 40 minutes"], frac: 0.20 },
   { title: "CDN SERVED THE WRONG TENANT", lines: ["Cross-tenant cache hits: 1,208", "Legal has been notified"], frac: 0.11 },
+  { title: "CERTIFICATE EXPIRED", lines: ["TLS handshake failures: 100%", "Renewal cron disabled in 2023", "Nobody owned the calendar invite"], frac: 0.38 },
+  { title: "RATE LIMITER RATE-LIMITED ITSELF", lines: ["Rejected requests: 890k", "Including the health check"], frac: 0.16 },
+  { title: "SEARCH INDEX WIPED", lines: ["Documents indexed: 0", "Reindex ETA: 6 hours", "Search box still very prominent"], frac: 0.14 },
+  { title: "EMAIL SENT TO EVERYONE", lines: ["Recipients: 12,482", "Subject: 'test ignore'", "Reply-all count: 61"], frac: 0.08 },
+  { title: "QUEUE CONSUMER DIED QUIETLY", lines: ["Unprocessed jobs: 2.2M", "Alert threshold: never configured"], frac: 0.19 },
+  { title: "FEATURE FLAG INVERTED", lines: ["Users on the unfinished checkout: 100%", "The flag was named is_disabled"], frac: 0.24 },
+  { title: "DISK FULL", lines: ["/var/log: 100%", "Largest file: the log about the disk being full"], frac: 0.21 },
+  { title: "TIMEZONE BUG AT MIDNIGHT", lines: ["Orders dated 1970: 4,201", "Only reproducible in production, at midnight"], frac: 0.13 },
+  { title: "THIRD PARTY WENT DOWN", lines: ["Vendor status page: green", "Vendor: not green", "Our fallback: also them"], frac: 0.17 },
 ];
 
 export const ROLLBACK_FAILS = [
@@ -151,6 +162,16 @@ export const ROLLBACK_FAILS = [
   "rolling back would undo the fix for the last rollback",
   "prod and staging were swapped in January and nobody said anything",
   "the deploy key expired 40 minutes ago",
+  "the previous version also had this bug, just quieter",
+  "rollback succeeded on 3 of 14 pods and then stopped",
+  "terraform wants to destroy the load balancer first",
+  "the artifact registry is rate-limiting us",
+  "someone force-pushed over the tag",
+  "the old config references a secret that was rotated",
+  "rollback is behind a feature flag that is off in prod",
+  "the last known good build is from a branch that was deleted",
+  "you are not on the VPN and the VPN is behind the load balancer",
+  "the rollback ran. it rolled back the rollback.",
 ];
 
 export const HOTFIX_FAILS = [
@@ -159,6 +180,13 @@ export const HOTFIX_FAILS = [
   "typo in the hotfix. shipped it anyway.",
   "linter blocked the merge for 11 minutes",
   "hotfix needs a migration",
+  "the hotfix was correct and applied to the wrong service",
+  "you hotfixed the symptom. the cause is compounding.",
+  "required approvals: 2. awake engineers: 1.",
+  "the hotfix passed review because nobody read it",
+  "hotfix reverted automatically by a policy nobody remembers writing",
+  "you fixed it locally and closed the laptop",
+  "the build queue is 40 minutes and the queue is the incident",
 ];
 
 export const WAIT_FAILS = [
@@ -166,6 +194,13 @@ export const WAIT_FAILS = [
   "the retry storm found new victims",
   "Twitter found out",
   "support queue: 1,400 tickets",
+  "it stabilised, then the retry backlog landed all at once",
+  "a customer livetweeted the whole hour",
+  "it healed. the data did not.",
+  "your status page is hosted on the thing that is down",
+  "someone escalated to the CEO, who escalated to you",
+  "the quiet was the connection pool filling up",
+  "it resolved itself and nobody knows why, which is worse",
 ];
 
 export type ItemId =
@@ -189,6 +224,49 @@ export const ITEM_POOL: Record<ItemId, number> = {
   staging: 10, ci: 14, diff: 14, logs: 10, revert: 9,
   rewrite: 7, friday: 7, postmortem: 8, contractor: 6, yolo: 6,
 };
+
+/** What you inherited. Drawn once per run from the seeded RNG, so a seed still replays.
+ *  Every field is a knob the engine already had — this only sets it differently. */
+export type CompanyId = "saas" | "fintech" | "crypto" | "bank" | "yc";
+
+export const COMPANIES: Record<CompanyId, {
+  name: string;
+  blurb: string;
+  uptime: number;      // starting and max nines
+  velocity: number;    // base velocity tokens per sprint
+  cash: number;
+  revenue: number;     // multiplier on every payout
+  damage: number;      // multiplier on uptime lost per incident
+  userLoss: number;    // multiplier on users lost per incident
+}> = {
+  saas: {
+    name: "ENTERPRISE SAAS",
+    blurb: "four nines in the contract, two in production. nobody has read the contract.",
+    uptime: 4, velocity: 2, cash: 800_000, revenue: 1, damage: 1, userLoss: 1,
+  },
+  fintech: {
+    name: "SERIES A FINTECH",
+    blurb: "the regulator makes leaving so painful that your users simply cannot. this is the moat.",
+    uptime: 3, velocity: 3, cash: 600_000, revenue: 0.9, damage: 1, userLoss: 0.8,
+  },
+  crypto: {
+    name: "CRYPTO EXCHANGE",
+    blurb: "revenue is double. so is everything else. the audit is 'in progress' and always will be.",
+    uptime: 3, velocity: 2, cash: 1_200_000, revenue: 2, damage: 2, userLoss: 1.5,
+  },
+  bank: {
+    name: "FORTY-YEAR-OLD BANK",
+    blurb: "six nines of uptime, one velocity token, and a change board that meets on Thursdays.",
+    uptime: 5, velocity: 1, cash: 500_000, revenue: 0.55, damage: 1, userLoss: 0.7,
+  },
+  yc: {
+    name: "YC BATCH, WEEK 3",
+    blurb: "two nines, four tokens, and a demo day. move fast, there is nothing to break yet.",
+    uptime: 2, velocity: 4, cash: 300_000, revenue: 1.4, damage: 1, userLoss: 1,
+  },
+};
+
+export const COMPANY_IDS = Object.keys(COMPANIES) as CompanyId[];
 
 export type UpgradeId =
   | "staging_env" | "observability" | "automated_rollback" | "better_monitoring"
@@ -219,6 +297,11 @@ export const SPRINT_NAMES = [
   "Project Falcon", "Project Monsoon", "Project Chai", "Project Lantern",
   "Project Ledger", "Project Otter", "Project Cardamom", "Project Rickshaw",
   "Project Nimbus", "Project Tiffin", "Project Banyan", "Project Kite",
+  "Project Peacock", "Project Sandalwood", "Project Dabba", "Project Monolith",
+  "Project Second Attempt", "Project Clean Slate", "Project Northstar",
+  "Project Simplify", "Project Simplify II", "Project Velocity",
+  "Project Bedrock", "Project Quicksand", "Project Guardrail",
+  "Project Last Mile", "Project Final Mile", "Project Actually Final Mile",
 ];
 
 /** Fired only after an incident has already resolved, or on a sprint clear. Never on a deploy
@@ -232,6 +315,42 @@ export const SLACK_TOASTS = [
   { channel: "#random", text: "lol" },
   { channel: "#eng", text: "reverting my unrelated PR just in case" },
   { channel: "#support", text: "customers are asking. what do we say" },
+  { channel: "#incidents", text: "adding this to the postmortem doc. the doc is a folder now." },
+  { channel: "#eng", text: "unrelated: does anyone know what this cron does" },
+  { channel: "#general", text: "reminder: all-hands moved to 4pm" },
+  { channel: "DM", text: "the-cto: are we down or are we 'degraded'" },
+  { channel: "#support", text: "a customer used the phrase 'per our contract'" },
+  { channel: "#incidents", text: "i can repro. i cannot explain." },
+  { channel: "#eng", text: "who has the pagerduty password" },
+  { channel: "#random", text: "posting the outage graph, it looks like a shark" },
+  { channel: "#incidents", text: "rolling forward. do not ask." },
+  { channel: "#design", text: "while we're down can we ship the new logo" },
+  { channel: "#eng", text: "it works on my machine, which is now also prod" },
+  { channel: "DM", text: "the-ceo: what is an SLA" },
+  { channel: "#incidents", text: "declaring this a sev2. it is a sev1. i have plans tonight." },
+  { channel: "#sales", text: "can i tell the client it was scheduled maintenance" },
+  { channel: "#eng", text: "the fix is one line. the line is in a repo nobody owns." },
+  { channel: "#general", text: "great work everyone. what happened?" },
+  { channel: "#incidents", text: "root cause: yes." },
+  { channel: "#eng", text: "i've muted this channel for my mental health" },
+];
+
+/** Diegetic sprint briefings. The count is the mechanic; this is who is telling you.
+ *  {bad} and {size} are filled in. Picked at random on the client — the choice is cosmetic and
+ *  independent of the queue, so it cannot become a tell. */
+export const QUEUE_BRIEFINGS = [
+  "QA signed off on all {size}. QA also flagged {bad} as 'concerning'. QA has left the company.",
+  "sprint planning: {size} deployments. the staff engineer says {bad} of them scare her. she did not say which.",
+  "the intern ran a risk model on {size} PRs. {bad} came back red. the model is a spreadsheet.",
+  "{size} in the queue. an anonymous #eng poll says {bad} will take prod down. the poll had four votes.",
+  "release notes: {size} changes, {bad} 'may affect availability'. legal made us write that.",
+  "on-call handoff: {size} queued, {bad} bad ones in there somewhere. good luck. i'm going camping.",
+  "your predecessor left a note. it says {bad} of these {size} are cursed. nothing else.",
+  "{size} deployments. the security review found {bad} problems and then the reviewer went on leave.",
+  "post-retro consensus: {size} ship this sprint, {bad} of them shouldn't. no further detail was minuted.",
+  "the CTO reviewed all {size} on a phone in an Uber. verdict: {bad} are 'probably fine, actually no'.",
+  "monitoring predicts {bad} incidents across {size} deploys. monitoring has been right once.",
+  "{size} merged overnight. a bot labelled {bad} of them 'high risk' and was immediately muted.",
 ];
 
 export const INVESTOR_UPDATES = [
@@ -241,14 +360,46 @@ export const INVESTOR_UPDATES = [
   "'headcount flat, ambition up'",
   "skipped this month",
   "'the incident was a learning opportunity'",
+  "'we have never been more focused'",
+  "'churn is a signal that we are finding our true users'",
+  "'downtime down 4% quarter on quarter'",
+  "'we are hiring a Head of Reliability (contract, part-time)'",
+  "'the roadmap has been simplified'",
+  "'ARR is up if you annualise last Tuesday'",
+  "'we made the difficult decision to sunset the status page'",
+  "'no notes from the board this month'",
+  "sent, then unsent, then sent again",
+  "'our infrastructure is now AI-native'",
+  "'engineering velocity has never been higher'",
+  "'we are being deliberate about growth'",
+  "read by two of nine recipients",
+  "'the competitor's outage was much worse'",
 ];
 
+/** Boot plays on every load, so it draws from a pool instead of reciting the same five lines.
+ *  BOOT_SHOWN is how many make it to the screen. */
+export const BOOT_SHOWN = 5;
 export const BOOT_LINES: [string, string][] = [
   ["checking on-call rotation", "nobody"],
   ["mounting /dev/prod", "read-write (!)"],
   ["loading SLA", "99.9% (aspirational)"],
   ["restoring nines of uptime", "found 2"],
   ["reticulating the deploy queue", "ok"],
+  ["reading the runbook", "404"],
+  ["counting staging environments", "0"],
+  ["locating the architecture diagram", "in someone's head"],
+  ["verifying backups", "assumed"],
+  ["loading incident history", "truncated"],
+  ["checking test coverage", "41% (generous)"],
+  ["resolving DNS", "eventually"],
+  ["warming the cache", "with production traffic"],
+  ["auditing prod access", "everyone"],
+  ["fetching the postmortem template", "unused"],
+  ["starting the status page", "green (hardcoded)"],
+  ["counting open PRs", "too many"],
+  ["checking the change freeze", "expired in March"],
+  ["measuring blast radius", "all of it"],
+  ["loading feature flags", "1,204 (none removed)"],
 ];
 
 export const ABOUT_LINES: [string, string][] = [
@@ -267,6 +418,16 @@ export const IDLE_NUDGES = [
   "someone asked for an ETA",
   "the queue is still there",
   "your calendar says 'focus time'",
+  "the PR author is online and can see you have not merged",
+  "a recruiter messaged you. it is tempting.",
+  "the deploy window closes at some point, probably",
+  "you have been staring at this commit for a while",
+  "nothing is on fire. suspicious.",
+  "someone renamed the channel to #incidents-active",
+  "your laptop fan just started",
+  "the intern is asking what 'staging' is",
+  "there is a meeting about the queue instead of clearing it",
+  "reading the diff again will not change what is in it",
 ];
 
 /** Typed into the console window. Purely cosmetic. */
@@ -275,7 +436,7 @@ export const CONSOLE_REPLIES: Record<string, string> = {
   "rm -rf /": "not funny.",
   rm: "not funny.",
   blame: "git blame says: the intern. the intern started on Monday.",
-  help: "commands: sudo, blame, uptime, deploy, vim, whoami, ship",
+  help: "commands: sudo, blame, uptime, deploy, vim, whoami, ship, ls, git, oncall, standup, sla, friday, status, top, exit, ai",
   uptime: "up 4 days. 3 of them were fine.",
   deploy: "use the button. it is right there.",
   vim: "you are trapped here with us.",
@@ -283,6 +444,36 @@ export const CONSOLE_REPLIES: Record<string, string> = {
   ship: "that is the spirit.",
   ls: "deploy.app  queue.mon  metrics.mon  tools.kit  console.log  regrets/",
   "cat regrets": "permission denied.",
+  git: "your working tree is dirty. so is everyone's.",
+  "git push --force": "to where. to WHERE.",
+  ssh: "you are already inside. that is the problem.",
+  kubectl: "context 'prod' is the only context.",
+  top: "one process. it is the migration. it has been 40 minutes.",
+  ps: "PID 1: hope",
+  exit: "there is no exit. there is an acquisition offer.",
+  pwd: "/var/www/prod (yes, really)",
+  history: "you do not want the history.",
+  man: "no manual entry. there was never a manual.",
+  test: "in prod, like everything else.",
+  rollback: "that is what the incident buttons are for.",
+  standup: "you missed it. they discussed the queue.",
+  oncall: "you.",
+  postmortem: "blameless, as long as we all agree who to blame.",
+  sla: "99.9%. aspirational. legally non-binding. mostly.",
+  coffee: "the machine is also down. unrelated.",
+  hire: "headcount is frozen. ambition is not.",
+  "chmod 777": "already done, in 2019, by someone who left.",
+  curl: "connection refused. by prod. personally.",
+  docker: "it builds on your machine. that is the whole feature.",
+  npm: "3,140 packages audited. 41 vulnerabilities. moving on.",
+  logs: "which ones. there are nine services and four log formats.",
+  monitoring: "monitoring is up. that is all monitoring can confirm.",
+  friday: "do not.",
+  vacation: "denied. the queue.",
+  blameless: "see: postmortem.",
+  status: "green. the status page is hardcoded.",
+  scale: "we scaled. the bill scaled harder.",
+  ai: "we put an LLM on the incident channel. it also panics.",
 };
 
 export type RunStats = {
@@ -298,6 +489,44 @@ export type RunStats = {
 };
 
 /** One earned title per run. First match wins, so order is priority. */
+/** The shareable block. Pure string building, no state — the point is that it shows what
+ *  happened without showing anyone the queue they would have had to read. */
+export function shareText(r: {
+  company: string;
+  round: number;
+  outcome: "acquired" | "outage" | "insolvent" | null;
+  title: string | null;
+  uptime: number;
+  maxUptime: number;
+  deploys: number;
+  incidents: number;
+  recklessDeploys: number;
+  score: number;
+  resolved: string[];
+}): string {
+  const GLYPH: Record<string, string> = {
+    ok: "\u{1f7e9}", down: "\u{1f7e5}", dodged: "\u{1f7e7}", wasted: "\u2b1c", reverted: "\u2b1c",
+  };
+  const ending =
+    r.outcome === "acquired" ? `sold for ${inr(r.score)}`
+      : r.outcome === "insolvent" ? "ran out of runway"
+        : "took prod down for good";
+
+  const lines = [
+    `PROD ROULETTE \u2014 ${r.company}, sprint ${r.round}`,
+    r.title ? `"${r.title}"` : null,
+    [
+      `${"\u25a0".repeat(Math.max(0, r.uptime))}${"\u25a1".repeat(Math.max(0, r.maxUptime - r.uptime))} uptime`,
+      `${r.deploys} deploys`,
+      `${r.incidents} incidents`,
+    ].join(" \u00b7 "),
+    r.resolved.length ? r.resolved.map((x) => GLYPH[x] ?? "\u2b1c").join("") : null,
+    r.recklessDeploys ? `${r.recklessDeploys} deploys shipped without reading a thing` : null,
+    ending,
+  ];
+  return lines.filter(Boolean).join(NEWLINE);
+}
+
 export function runTitle(s: RunStats): string | null {
   if (s.outcome === "acquired" && s.upgrades === 0) return "LUCKY";
   if (s.outcome === "acquired" && s.recklessDeploys >= 15) return "RECKLESS AND RICH";

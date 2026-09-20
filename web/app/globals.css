@@ -60,6 +60,22 @@ p { margin: 0 0 4px; }
 .menubar .logo { font-size: 12px; padding-right: 4px; }
 .menubar .menuspace { flex: 1; }
 .menubar .clock { font-family: var(--font-stack-mono); font-size: 14px; letter-spacing: 1px; }
+
+/* the settled-slots strip in queue.mon */
+.queuestrip { display: flex; gap: 6px; font-size: 18px; margin: 6px 0 8px !important; }
+.queuestrip b { font-weight: normal; }
+.queuestrip b.ok { color: var(--green); }
+.queuestrip b.down { color: var(--red); }
+.queuestrip b.dodged { color: var(--amber); }
+.queuestrip b.wasted { opacity: 0.4; }
+.queuestrip b.here { color: var(--ink); animation: blink 1.1s steps(2) infinite; }
+.queuestrip b.unknown { opacity: 0.3; }
+
+.sharebox {
+  width: 100%; margin-top: 8px; padding: 6px;
+  font-family: var(--font-stack-mono); font-size: 13px; line-height: 1.4;
+  background: var(--paper); color: var(--ink); border: 2px solid var(--ink); resize: vertical;
+}
 .menu { position: relative; }
 .menutitle {
   border: 0;
@@ -457,6 +473,7 @@ p { margin: 0 0 4px; }
 .bootscreen p { margin: 0; white-space: pre; }
 .bootheader { font-family: var(--font-stack-ui); font-size: 12px; margin-bottom: 14px !important; }
 .bootok { color: var(--amber); margin-top: 10px !important; }
+.bootprompt { margin-top: 18px !important; animation: blink 1.1s steps(2) infinite; }
 
 /* ---------- slack toasts ---------- */
 
